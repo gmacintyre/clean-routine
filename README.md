@@ -43,7 +43,6 @@ In the Azure portal: **Create a resource → Web App**
 In the new web app, open **Settings → Configuration → General settings**:
 
 - **HTTPS Only: On**
-- **SCM Basic Auth Publishing Credentials: On.** The GitHub deploy below uses a publish profile, which needs this.
 
 Always On isn't available on the Free plan. The wake-up job in step 7 takes its place.
 
@@ -74,15 +73,17 @@ In **Settings → Environment variables → App settings**, add:
 
 Data is saved to `%HOME%/data/clean-routine/household.json`. That's App Service's persistent storage, so it survives restarts and redeploys.
 
-### 5. Connect GitHub for automatic deploys
+### 5. Automatic deploys from GitHub
 
-1. In the web app's **Overview**, click **Download publish profile**.
-2. In this GitHub repo, go to **Settings → Secrets and variables → Actions**.
-   - Under **Secrets**, add `AZURE_WEBAPP_PUBLISH_PROFILE` and paste the whole publish profile file.
-   - Under **Variables**, add `AZURE_WEBAPP_NAME` with the web app's name.
-3. Push to `main`, or run the **Build and deploy to Azure** workflow from the Actions tab.
+Deploys use the workflow Visual Studio created when publishing (`.github/workflows/CleanRoutine20261029180254.yml`), like the tea recipe app's. It signs in to Azure with a managed identity instead of a stored password, and runs on every push to `main`.
 
-Until those two values are set, the workflow only builds and skips the deploy.
+It needs three variables in the repo's **Settings → Environments → CleanRoutine20261029180254_Env**:
+
+- `CleanRoutine20261029180254_CLIENT_ID_EC6B`: the **Client ID** of the managed identity Visual Studio created (search for "Managed Identities" in the portal; it's named after the app)
+- `CleanRoutine20261029180254_TENANT_ID_EC6B`: your **Directory (tenant) ID**, the same value as the tea app's `..._TENANT_ID_...` variable
+- `CleanRoutine20261029180254_SUBSCRIPTION_ID_EC6B`: your **Subscription ID**, the same value as the tea app's
+
+If the **Azure Login** step fails with "Not all values are present", one of these is missing.
 
 ### 6. Set up each phone
 
