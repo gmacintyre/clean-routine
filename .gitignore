@@ -1,0 +1,10 @@
+bin/
+obj/
+.vs/
+*.user
+*.swp
+.idea/
+publish/
+# Local data file (contains password hashes) - never commit
+App_Data/
+appsettings.Local.json

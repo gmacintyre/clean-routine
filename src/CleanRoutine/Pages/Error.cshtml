@@ -1,0 +1,18 @@
+﻿@page
+@model ErrorModel
+@{
+    ViewData["Title"] = "Something went wrong";
+}
+
+<div class="auth">
+    <div class="dayhead">
+        <span class="eyebrow">Clean Routine</span>
+        <h1>Something went wrong</h1>
+    </div>
+    <p>The app hit an error loading that page. Go back and try again; if it keeps happening, check the App Service log stream.</p>
+    @if (Model.ShowRequestId)
+    {
+        <p class="note">Request ID: <code>@Model.RequestId</code></p>
+    }
+    <p><a class="btn" href="/">Back to today</a></p>
+</div>

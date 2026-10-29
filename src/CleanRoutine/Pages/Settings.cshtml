@@ -1,0 +1,157 @@
+@page
+@model SettingsModel
+@{
+    ViewData["Title"] = "Reminders";
+    ViewData["Nav"] = "settings";
+}
+
+<div class="dayhead">
+    <span class="eyebrow">Reminders</span>
+    <h1>Daily heads-up</h1>
+    <p class="note">One notification a day to each phone that has them turned on, listing that day's zone and jobs.</p>
+</div>
+
+<section class="section">
+    <h2>When</h2>
+    <form method="post" asp-page-handler="Reminder" class="card">
+        <div class="field">
+            <label for="time">Reminder time</label>
+            <input class="txt" type="time" id="time" name="time" value="@Model.Reminders.Time.ToString("HH:mm")" required style="max-width:180px" />
+        </div>
+        <label class="check" for="enabled">
+            <input type="checkbox" id="enabled" name="enabled" value="true" checked="@Model.Reminders.Enabled" />
+            Send the daily reminder
+        </label>
+        <div><button class="btn" type="submit">Save</button></div>
+        <p class="note">This time applies to both of you.</p>
+    </form>
+</section>
+
+<section class="section">
+    <h2>This phone</h2>
+    <div class="card" id="push-card">
+        @if (!Model.PushConfigured)
+        {
+            <p class="banner">Notifications aren't set up on the server yet. Add the Push__PublicKey and Push__PrivateKey app settings (see the README).</p>
+        }
+        else
+        {
+            <p id="push-status" class="note">Checking this phone…</p>
+            <div class="row wrap">
+                <button class="btn" id="push-on" type="button" hidden>Turn on notifications</button>
+                <button class="btn secondary" id="push-test" type="button" hidden>Send a test</button>
+                <button class="link-btn" id="push-off" type="button" hidden>Turn off on this phone</button>
+            </div>
+        }
+    </div>
+</section>
+
+<section class="section">
+    <h2>Household</h2>
+    <div class="card">
+        @foreach (var p in Model.People)
+        {
+            <div class="row spread">
+                <span>@p.Name</span>
+                <span class="count">@(p.Devices == 1 ? "1 phone" : $"{p.Devices} phones") with reminders</span>
+            </div>
+        }
+        <form method="post" asp-page="/Account/Logout">
+            <button class="link-btn" type="submit">Sign out of this phone</button>
+        </form>
+    </div>
+</section>
+
+@section Scripts {
+    @if (TempData["Toast"] is string toast)
+    {
+        <script>cr.toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toast)));</script>
+    }
+    @if (Model.PushConfigured)
+    {
+        <script>
+        (async () => {
+          const key = "@Model.PublicKey";
+          const status = document.getElementById("push-status");
+          const on = document.getElementById("push-on"), off = document.getElementById("push-off"), test = document.getElementById("push-test");
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+          const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+          const show = (text, buttons) => {
+            status.textContent = text;
+            on.hidden = !buttons.includes("on"); off.hidden = !buttons.includes("off"); test.hidden = !buttons.includes("test");
+          };
+          const toBytes = (b64) => {
+            const s = atob((b64 + "===".slice((b64.length + 3) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+            return Uint8Array.from(s, (c) => c.charCodeAt(0));
+          };
+          const deviceName = () => isIOS ? "iPhone" : /Android/.test(navigator.userAgent) ? "Android" : "Browser";
+
+          if (isIOS && !standalone) {
+            show("On iPhone, add this app to your Home Screen first: tap Share, then “Add to Home Screen”. Open it from there and come back to this page.", []);
+            return;
+          }
+          if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+            show("This browser can't receive notifications. Try Chrome on Android, or the Home Screen app on iPhone.", []);
+            return;
+          }
+
+          const reg = await navigator.serviceWorker.register("/sw.js");
+          await navigator.serviceWorker.ready;
+
+          const showOff = () => Notification.permission === "denied"
+            ? show("Notifications are blocked for this app. Allow them in your phone's settings, then reload.", [])
+            : show("Notifications are off for this phone.", ["on"]);
+
+          async function save(sub, handler) {
+            const json = sub.toJSON();
+            const res = await fetch("?handler=" + handler, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", RequestVerificationToken: cr.token },
+              body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys, device: deviceName() }),
+            });
+            if (!res.ok) throw new Error("HTTP " + res.status);
+          }
+
+          on.addEventListener("click", async () => {
+            on.disabled = true;
+            try {
+              const perm = await Notification.requestPermission();
+              if (perm !== "granted") { showOff(); return; }
+              const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: toBytes(key) });
+              await save(sub, "Subscribe");
+              show("Notifications are on for this phone.", ["test", "off"]);
+              cr.toast("Notifications turned on");
+            } catch (e) {
+              cr.toast("Couldn't turn on notifications. Try again in a moment.");
+            } finally { on.disabled = false; }
+          });
+
+          off.addEventListener("click", async () => {
+            const sub = await reg.pushManager.getSubscription();
+            if (sub) { await save(sub, "Unsubscribe").catch(() => {}); await sub.unsubscribe(); }
+            show("Notifications are off for this phone.", ["on"]);
+            cr.toast("Notifications turned off on this phone");
+          });
+
+          test.addEventListener("click", async () => {
+            test.disabled = true;
+            try {
+              const r = await cr.post("?handler=Test");
+              cr.toast(r.sent > 0 ? `Sent to ${r.sent} ${r.sent === 1 ? "phone" : "phones"}` : "Nothing was delivered. Turn notifications off and on again.");
+            } catch { cr.toast("The test didn't send. Try again."); }
+            finally { test.disabled = false; }
+          });
+
+          // Keep the server's copy in sync with this phone's subscription.
+          const existing = await reg.pushManager.getSubscription();
+          if (existing && Notification.permission === "granted") {
+            await save(existing, "Subscribe").catch(() => {});
+            show("Notifications are on for this phone.", ["test", "off"]);
+          } else {
+            showOff();
+          }
+        })();
+        </script>
+    }
+}

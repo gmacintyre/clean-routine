@@ -1,0 +1,133 @@
+@page
+@model IndexModel
+@using CleanRoutine.Domain
+@{
+    ViewData["Title"] = "Today";
+    ViewData["Nav"] = "today";
+    var p = Model.Plan;
+    var d = p.Date;
+    var rel = d == Model.Today ? "Today"
+        : d == Model.Today.AddDays(-1) ? "Yesterday"
+        : d == Model.Today.AddDays(1) ? "Tomorrow"
+        : d < Model.Today ? "Past day" : "Coming up";
+    var total = p.Tasks.Count;
+    var pct = total == 0 ? 0 : (int)Math.Round(p.DoneCount * 100.0 / total);
+    var groups = new (Frequency F, string Title, string Sub)[]
+    {
+        (Frequency.Daily, "Every day", ""),
+        (Frequency.Weekly, string.IsNullOrWhiteSpace(p.Zone) ? "This week" : p.Zone!, $"Every {d:dddd}"),
+        (Frequency.Monthly, "Monthly", ""),
+        (Frequency.Seasonal, "Seasonal", "Jan · Apr · Jul · Oct"),
+    };
+}
+
+<div class="dayhead">
+    <div class="row spread">
+        <span class="eyebrow">@rel</span>
+        <div class="row">
+            <a class="icon-btn" href="/?date=@IndexModel.Key(d.AddDays(-1))" aria-label="Previous day">‹</a>
+            <a class="icon-btn" href="/?date=@IndexModel.Key(d.AddDays(1))" aria-label="Next day">›</a>
+        </div>
+    </div>
+    <h1>@d.ToString("dddd, MMM d")</h1>
+    <div class="row wrap">
+        @if (!string.IsNullOrWhiteSpace(p.Zone))
+        {
+            <span class="chip">@p.Zone day</span>
+        }
+        @if (p.HasBigJob)
+        {
+            <span class="chip amber">Bigger job today</span>
+        }
+        @if (d != Model.Today)
+        {
+            <a class="link-btn" href="/">Back to today</a>
+        }
+    </div>
+</div>
+
+@if (total == 0)
+{
+    <div class="empty">
+        <h3>Nothing scheduled</h3>
+        <span class="muted">Add tasks in Routine and they'll show up on the right days.</span>
+    </div>
+}
+else
+{
+    <div class="stack" id="progress" data-total="@total">
+        <div class="row spread">
+            <span class="count" id="count">@p.DoneCount of @total done</span>
+            <span class="count" id="pct">@pct%</span>
+        </div>
+        <div class="bar"><i id="bar" style="width:@pct%"></i></div>
+    </div>
+    <div class="alldone" id="alldone" @(p.DoneCount == total ? "" : "hidden")>
+        @(d == Model.Today ? "All done for today. Nice work." : "Everything on this day was checked off.")
+    </div>
+
+    @foreach (var g in groups)
+    {
+        var items = p.Tasks.Where(t => t.Frequency == g.F).ToList();
+        if (items.Count == 0) continue;
+        var sub = g.F switch
+        {
+            Frequency.Daily => $"{items.Count(t => t.DoneByUserId != null)}/{items.Count}",
+            Frequency.Monthly => $"{Schedule.Ordinal(items[0].WeekOfMonth ?? 1)} {items[0].Weekday} of the month",
+            _ => g.Sub,
+        };
+        <section class="group">
+            <div class="group-h"><h2>@g.Title</h2><span class="count" @(g.F == Frequency.Daily ? "data-groupcount" : "")>@sub</span></div>
+            <div class="list">
+                @foreach (var t in items)
+                {
+                    var done = t.DoneByUserId != null;
+                    var who = done ? Model.UserOrder.IndexOf(t.DoneByUserId!) : -1;
+                    <label class="item @(done ? "done" : "")">
+                        <input type="checkbox" id="chk-@t.Id" data-task="@t.Id" checked="@done" />
+                        <span class="t">@t.Title</span>
+                        <span class="who @(who == 1 ? "p2" : "")" title="@(done ? "Done by " + (t.DoneByName ?? "someone") : "")" @(done ? "" : "hidden")>@(t.DoneByName?.Substring(0, 1).ToUpperInvariant())</span>
+                    </label>
+                }
+            </div>
+        </section>
+    }
+}
+
+@section Scripts {
+<script>
+(() => {
+  const date = "@IndexModel.Key(d)";
+  const me = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(User.Identity?.Name ?? ""));
+  const myIndex = @Model.UserOrder.IndexOf(User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "");
+  document.querySelectorAll("input[data-task]").forEach((box) => {
+    box.addEventListener("change", async () => {
+      const row = box.closest(".item"), who = row.querySelector(".who");
+      const want = box.checked;
+      row.classList.toggle("done", want);
+      box.disabled = true;
+      try {
+        const r = await cr.post("?handler=Toggle", { taskId: box.dataset.task, date });
+        box.checked = r.done;
+        row.classList.toggle("done", r.done);
+        if (r.done) { who.textContent = me.slice(0, 1).toUpperCase(); who.title = "Done by " + me; who.classList.toggle("p2", myIndex === 1); }
+        who.hidden = !r.done;
+        const pct = Math.round(r.doneCount / r.total * 100);
+        document.getElementById("count").textContent = r.doneCount + " of " + r.total + " done";
+        document.getElementById("pct").textContent = pct + "%";
+        document.getElementById("bar").style.width = pct + "%";
+        document.getElementById("alldone").hidden = r.doneCount !== r.total;
+        const grp = row.closest(".group"), gc = grp.querySelector("[data-groupcount]");
+        if (gc) gc.textContent = grp.querySelectorAll("input[data-task]:checked").length + "/" + grp.querySelectorAll("input[data-task]").length;
+      } catch {
+        box.checked = !want;
+        row.classList.toggle("done", !want);
+        cr.toast("That didn't save. Check your connection and try again.");
+      } finally {
+        box.disabled = false;
+      }
+    });
+  });
+})();
+</script>
+}

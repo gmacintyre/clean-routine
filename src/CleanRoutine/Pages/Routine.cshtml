@@ -1,0 +1,124 @@
+@page
+@model RoutineModel
+@using CleanRoutine.Domain
+@{
+    ViewData["Title"] = "Routine";
+    ViewData["Nav"] = "routine";
+}
+
+@functions {
+    // One editable task row. Monthly and seasonal tasks also pick which week and day they land on.
+    private async Task TaskRow(CleaningTask t)
+    {
+        var sched = t.Frequency is Frequency.Monthly or Frequency.Seasonal;
+        <div class="edit-row @(sched ? "sched" : "")">
+            <form method="post" asp-page-handler="Update">
+                <input type="hidden" name="id" value="@t.Id" />
+                <input class="txt" id="title-@t.Id" name="title" value="@t.Title" aria-label="Task name" maxlength="120" data-autosubmit />
+                @if (sched)
+                {
+                    <select id="week-@t.Id" name="week" aria-label="Which week" data-autosubmit>
+                        @for (var n = 1; n <= 4; n++)
+                        {
+                            <option value="@n" selected="@(t.WeekOfMonth == n)">@Schedule.Ordinal(n)</option>
+                        }
+                    </select>
+                    <select id="day-@t.Id" name="weekday" aria-label="Which day" data-autosubmit>
+                        @foreach (var w in Schedule.WeekOrder)
+                        {
+                            <option value="@w" selected="@(t.Weekday == w)">@w.ToString()[..3]</option>
+                        }
+                    </select>
+                }
+                <button type="submit" class="hidden-submit">Save</button>
+            </form>
+            <form method="post" asp-page-handler="Delete">
+                <input type="hidden" name="id" value="@t.Id" />
+                <button class="rm" type="submit" aria-label="Remove @t.Title">×</button>
+            </form>
+        </div>
+        await Task.CompletedTask;
+    }
+
+    private async Task AddRow(Frequency f, DayOfWeek? day, string placeholder, string id)
+    {
+        <form method="post" asp-page-handler="Add" class="add">
+            <input type="hidden" name="frequency" value="@f" />
+            @if (day is not null)
+            {
+                <input type="hidden" name="weekday" value="@day" />
+            }
+            <input class="txt" id="@id" name="title" placeholder="@placeholder" aria-label="@placeholder" maxlength="120" />
+            <button class="btn" type="submit">Add</button>
+        </form>
+        await Task.CompletedTask;
+    }
+}
+
+<div class="dayhead">
+    <span class="eyebrow">Routine</span>
+    <h1>What repeats, and when</h1>
+    <p class="note">Changes here update the calendar for both of you. Weekly tasks land on the same day every week. Edits save when you leave a field.</p>
+</div>
+
+<section class="section" id="daily">
+    <h2>Every day</h2>
+    <div class="card">
+        @foreach (var t in Model.Tasks.Where(t => t.Frequency == Frequency.Daily))
+        {
+            await TaskRow(t);
+        }
+        @{ await AddRow(Frequency.Daily, null, "Add a daily task", "add-daily"); }
+    </div>
+</section>
+
+<section class="section">
+    <h2>Weekly zones</h2>
+    @foreach (var w in Schedule.WeekOrder)
+    {
+        <div class="card" id="day-@((int)w)">
+            <form method="post" asp-page-handler="Zone" class="zone-row">
+                <input type="hidden" name="day" value="@w" />
+                <span class="eyebrow">@w.ToString()[..3]</span>
+                <input class="txt" id="zone-@((int)w)" name="name" value="@Model.Zones[(int)w]" placeholder="Name this day" aria-label="@w zone name" maxlength="40" data-autosubmit />
+                <button type="submit" class="hidden-submit">Save</button>
+            </form>
+            @foreach (var t in Model.Tasks.Where(t => t.Frequency == Frequency.Weekly && t.Weekday == w))
+            {
+                await TaskRow(t);
+            }
+            @{ await AddRow(Frequency.Weekly, w, $"Add a {w} task", $"add-{(int)w}"); }
+        </div>
+    }
+</section>
+
+<section class="section" id="monthly">
+    <h2>Monthly</h2>
+    <p class="note">Pick the week and day each one lands on.</p>
+    <div class="card">
+        @foreach (var t in Model.Tasks.Where(t => t.Frequency == Frequency.Monthly))
+        {
+            await TaskRow(t);
+        }
+        @{ await AddRow(Frequency.Monthly, null, "Add a monthly task", "add-monthly"); }
+    </div>
+</section>
+
+<section class="section" id="seasonal">
+    <h2>Seasonal</h2>
+    <p class="note">Runs in January, April, July and October.</p>
+    <div class="card">
+        @foreach (var t in Model.Tasks.Where(t => t.Frequency == Frequency.Seasonal))
+        {
+            await TaskRow(t);
+        }
+        @{ await AddRow(Frequency.Seasonal, null, "Add a seasonal task", "add-seasonal"); }
+    </div>
+</section>
+
+@section Scripts {
+    @if (TempData["Toast"] is string toast)
+    {
+        <script>cr.toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toast)));</script>
+    }
+}

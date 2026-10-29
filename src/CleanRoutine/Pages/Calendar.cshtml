@@ -1,0 +1,47 @@
+@page
+@model CalendarModel
+@{
+    ViewData["Title"] = "Calendar";
+    ViewData["Nav"] = "calendar";
+    var m = Model.Month;
+}
+
+<div class="dayhead">
+    <span class="eyebrow">Calendar</span>
+    <div class="row spread">
+        <h1>@m.ToString("MMMM yyyy")</h1>
+        <div class="row">
+            <a class="icon-btn" href="/Calendar?month=@CalendarModel.Key(m.AddMonths(-1))" aria-label="Previous month">‹</a>
+            <a class="icon-btn" href="/Calendar?month=@CalendarModel.Key(m.AddMonths(1))" aria-label="Next month">›</a>
+        </div>
+    </div>
+</div>
+
+<div class="cal">
+    <div class="cal-grid">
+        @foreach (var wd in new[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" })
+        {
+            <div class="cal-wd">@wd</div>
+        }
+        @foreach (var day in Model.Days)
+        {
+            var cls = "cell" + (day.Date.Month != m.Month ? " out" : "") + (day.Date == Model.Today ? " today" : "");
+            var showBar = day.Due > 0 && (day.Done > 0 || day.Date == Model.Today);
+            <a class="@cls" href="/?date=@IndexModel.Key(day.Date)"
+               aria-label="@day.Date.ToString("dddd MMMM d"), @day.Done of @day.Due done">
+                <span class="n"><span>@day.Date.Day</span>@if (day.HasBigJob) { <i class="dot"></i> }</span>
+                <span class="z">@day.Zone</span>
+                @if (showBar)
+                {
+                    <span class="mini"><i style="width:@(day.Done * 100 / day.Due)%"></i></span>
+                }
+            </a>
+        }
+    </div>
+</div>
+
+<div class="legend">
+    <span><i class="dot"></i>Monthly or seasonal job</span>
+    <span><i class="swatch"></i>How much got done</span>
+</div>
+<p class="note">Tap a day to see its checklist.</p>
