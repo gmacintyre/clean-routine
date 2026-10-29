@@ -18,6 +18,7 @@
         (Frequency.Weekly, string.IsNullOrWhiteSpace(p.Zone) ? "This week" : p.Zone!, $"Every {d:dddd}"),
         (Frequency.Monthly, "Monthly", ""),
         (Frequency.Seasonal, "Seasonal", "Jan · Apr · Jul · Oct"),
+        (Frequency.Once, "One-off", "Just this day"),
     };
 }
 
@@ -50,7 +51,7 @@
 {
     <div class="empty">
         <h3>Nothing scheduled</h3>
-        <span class="muted">Add tasks in Routine and they'll show up on the right days.</span>
+        <span class="muted">Add a one-off job below, or set up repeating chores in Routine.</span>
     </div>
 }
 else
@@ -94,7 +95,13 @@ else
     }
 }
 
+<a class="btn secondary" href="/Chore?frequency=Once&date=@IndexModel.Key(d)&returnUrl=@Uri.EscapeDataString("/?date=" + IndexModel.Key(d))">+ Add a one-off job for this day</a>
+
 @section Scripts {
+@if (TempData["Toast"] is string toast)
+{
+    <script>cr.toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toast)));</script>
+}
 <script>
 (() => {
   const date = "@IndexModel.Key(d)";

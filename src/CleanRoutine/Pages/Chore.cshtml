@@ -1,0 +1,138 @@
+@page "{id?}"
+@model ChoreModel
+@using CleanRoutine.Domain
+@{
+    ViewData["Title"] = Model.IsNew ? "Add a chore" : "Edit chore";
+    ViewData["Nav"] = "routine";
+    var options = new (Frequency F, string Label, string Hint)[]
+    {
+        (Frequency.Daily, "Every day", "Shows up on every day's list"),
+        (Frequency.Weekly, "Every week", "Same day each week"),
+        (Frequency.Monthly, "Once a month", "For example, the 2nd Saturday"),
+        (Frequency.Seasonal, "Every season", "January, April, July and October"),
+        (Frequency.Once, "Just once", "A one-off job on a set date"),
+    };
+}
+
+<div class="dayhead">
+    <a class="link-btn" href="@Model.CancelUrl">‹ Back</a>
+    <h1>@(Model.IsNew ? "Add a chore" : "Edit chore")</h1>
+</div>
+
+<form method="post" class="stack" style="gap:20px" id="chore-form">
+    @if (Model.Errors.Count > 0)
+    {
+        <div class="banner" role="alert">
+            @foreach (var e in Model.Errors)
+            {
+                <div>@e</div>
+            }
+        </div>
+    }
+
+    <div class="card">
+        <div class="field">
+            <label for="Input_Title">Chore</label>
+            <input class="txt" asp-for="Input.Title" placeholder="e.g. Wipe down the high chair" maxlength="@ChoreModel.MaxTitle" required autofocus="@Model.IsNew" autocomplete="off" />
+        </div>
+    </div>
+
+    <fieldset class="card" style="margin:0">
+        <legend class="sr-only">How often</legend>
+        <h2>How often</h2>
+        <div class="choices">
+            @foreach (var o in options)
+            {
+                <label class="choice">
+                    <input type="radio" name="Input.Frequency" value="@o.F" checked="@(Model.Input.Frequency == o.F)" />
+                    <span><strong>@o.Label</strong><span class="note">@o.Hint</span></span>
+                </label>
+            }
+        </div>
+    </fieldset>
+
+    <div class="card" id="when" data-for="Weekly Monthly Seasonal Once">
+        <h2>When</h2>
+        <div class="row wrap" data-for="Monthly Seasonal">
+            <div class="field">
+                <label for="Input_WeekOfMonth">Week of the month</label>
+                <select asp-for="Input.WeekOfMonth">
+                    @for (var n = 1; n <= 4; n++)
+                    {
+                        <option value="@n">@Schedule.Ordinal(n)</option>
+                    }
+                </select>
+            </div>
+        </div>
+        <div class="field" data-for="Weekly Monthly Seasonal">
+            <span class="label">Day of the week</span>
+            <div class="days" role="radiogroup" aria-label="Day of the week">
+                @foreach (var w in Schedule.WeekOrder)
+                {
+                    <label class="day">
+                        <input type="radio" name="Input.Weekday" value="@w" checked="@(Model.Input.Weekday == w)" />
+                        <span>@w.ToString()[..3]</span>
+                    </label>
+                }
+            </div>
+        </div>
+        <div class="field" data-for="Once">
+            <label for="Input_Date">Date</label>
+            <input class="txt" asp-for="Input.Date" type="date" style="max-width:220px" />
+        </div>
+        <p class="note" id="summary"></p>
+    </div>
+
+    <div class="row wrap">
+        <button class="btn" type="submit">@(Model.IsNew ? "Add chore" : "Save changes")</button>
+        <a class="btn secondary" href="@Model.CancelUrl">Cancel</a>
+    </div>
+</form>
+
+@if (!Model.IsNew)
+{
+    <div class="card danger-zone">
+        <div id="delete-ask" class="row spread wrap">
+            <span class="note">Removes it from every day, including what's already been ticked off.</span>
+            <button class="link-btn danger" type="button" id="delete-start">Delete chore</button>
+        </div>
+        <form method="post" asp-page-handler="Delete" id="delete-confirm" class="row wrap" hidden>
+            <strong>Delete “@Model.Input.Title” for good?</strong>
+            <button class="btn danger" type="submit">Delete</button>
+            <button class="btn secondary" type="button" id="delete-cancel">Keep it</button>
+        </form>
+    </div>
+}
+
+@section Scripts {
+<script>
+(() => {
+  const form = document.getElementById("chore-form");
+  const ordinal = (n) => ["", "1st", "2nd", "3rd", "4th"][n] || n + "th";
+  const dayNames = { Sunday: "Sunday", Monday: "Monday", Tuesday: "Tuesday", Wednesday: "Wednesday", Thursday: "Thursday", Friday: "Friday", Saturday: "Saturday" };
+
+  function update() {
+    const f = form.querySelector('input[name="Input.Frequency"]:checked')?.value;
+    form.querySelectorAll("[data-for]").forEach((el) => { el.hidden = !el.dataset.for.split(" ").includes(f); });
+    const day = dayNames[form.querySelector('input[name="Input.Weekday"]:checked')?.value] || "";
+    const week = ordinal(+form.querySelector("#Input_WeekOfMonth").value);
+    const date = form.querySelector("#Input_Date").value;
+    const dateText = date ? new Date(date + "T12:00").toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" }) : "the date you pick";
+    document.getElementById("summary").textContent = {
+      Weekly: `Shows up every ${day}.`,
+      Monthly: `Shows up on the ${week} ${day} of each month.`,
+      Seasonal: `Shows up on the ${week} ${day} of January, April, July and October.`,
+      Once: `Shows up once, on ${dateText}.`,
+    }[f] || "";
+  }
+  form.addEventListener("change", update);
+  update();
+
+  const ask = document.getElementById("delete-ask"), confirm = document.getElementById("delete-confirm");
+  if (ask) {
+    document.getElementById("delete-start").addEventListener("click", () => { ask.hidden = true; confirm.hidden = false; });
+    document.getElementById("delete-cancel").addEventListener("click", () => { confirm.hidden = true; ask.hidden = false; });
+  }
+})();
+</script>
+}

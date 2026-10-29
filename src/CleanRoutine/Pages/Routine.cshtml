@@ -7,112 +7,100 @@
 }
 
 @functions {
-    // One editable task row. Monthly and seasonal tasks also pick which week and day they land on.
-    private async Task TaskRow(CleaningTask t)
+    // A chore row: tap it to edit. The right side says when it happens.
+    private async Task ChoreLink(CleaningTask t, bool showWhen)
     {
-        var sched = t.Frequency is Frequency.Monthly or Frequency.Seasonal;
-        <div class="edit-row @(sched ? "sched" : "")">
-            <form method="post" asp-page-handler="Update">
-                <input type="hidden" name="id" value="@t.Id" />
-                <input class="txt" id="title-@t.Id" name="title" value="@t.Title" aria-label="Task name" maxlength="120" data-autosubmit />
-                @if (sched)
-                {
-                    <select id="week-@t.Id" name="week" aria-label="Which week" data-autosubmit>
-                        @for (var n = 1; n <= 4; n++)
-                        {
-                            <option value="@n" selected="@(t.WeekOfMonth == n)">@Schedule.Ordinal(n)</option>
-                        }
-                    </select>
-                    <select id="day-@t.Id" name="weekday" aria-label="Which day" data-autosubmit>
-                        @foreach (var w in Schedule.WeekOrder)
-                        {
-                            <option value="@w" selected="@(t.Weekday == w)">@w.ToString()[..3]</option>
-                        }
-                    </select>
-                }
-                <button type="submit" class="hidden-submit">Save</button>
-            </form>
-            <form method="post" asp-page-handler="Delete">
-                <input type="hidden" name="id" value="@t.Id" />
-                <button class="rm" type="submit" aria-label="Remove @t.Title">×</button>
-            </form>
-        </div>
+        <a class="chore" href="/Chore/@t.Id">
+            <span class="t">@t.Title</span>
+            @if (showWhen)
+            {
+                <span class="when">@(t.Frequency == Frequency.Once ? t.Date?.ToString("ddd MMM d") : $"{Schedule.Ordinal(t.WeekOfMonth ?? 1)} {t.Weekday?.ToString()[..3]}")</span>
+            }
+            <span class="chev" aria-hidden="true">›</span>
+        </a>
         await Task.CompletedTask;
     }
 
-    private async Task AddRow(Frequency f, DayOfWeek? day, string placeholder, string id)
+    private async Task AddLink(string href, string label)
     {
-        <form method="post" asp-page-handler="Add" class="add">
-            <input type="hidden" name="frequency" value="@f" />
-            @if (day is not null)
-            {
-                <input type="hidden" name="weekday" value="@day" />
-            }
-            <input class="txt" id="@id" name="title" placeholder="@placeholder" aria-label="@placeholder" maxlength="120" />
-            <button class="btn" type="submit">Add</button>
-        </form>
+        <a class="chore add-chore" href="@href"><span class="plus" aria-hidden="true">+</span><span class="t">@label</span></a>
         await Task.CompletedTask;
     }
 }
 
 <div class="dayhead">
     <span class="eyebrow">Routine</span>
-    <h1>What repeats, and when</h1>
-    <p class="note">Changes here update the calendar for both of you. Weekly tasks land on the same day every week. Edits save when you leave a field.</p>
+    <div class="row spread wrap">
+        <h1>Chores</h1>
+        <a class="btn" href="/Chore">+ Add a chore</a>
+    </div>
+    <p class="note">Tap a chore to rename it, change how often it happens, move it to another day, or delete it. Changes show up for both of you.</p>
 </div>
 
 <section class="section" id="daily">
-    <h2>Every day</h2>
-    <div class="card">
-        @foreach (var t in Model.Tasks.Where(t => t.Frequency == Frequency.Daily))
+    <div class="group-h"><h2>Every day</h2><span class="count">@Model.Of(Frequency.Daily).Count()</span></div>
+    <div class="list">
+        @foreach (var t in Model.Of(Frequency.Daily))
         {
-            await TaskRow(t);
+            await ChoreLink(t, false);
         }
-        @{ await AddRow(Frequency.Daily, null, "Add a daily task", "add-daily"); }
+        @{ await AddLink("/Chore?frequency=Daily", "Add a daily chore"); }
     </div>
 </section>
 
 <section class="section">
-    <h2>Weekly zones</h2>
+    <h2>Every week</h2>
+    <p class="note">Each day has a zone. Rename it to whatever fits.</p>
     @foreach (var w in Schedule.WeekOrder)
     {
-        <div class="card" id="day-@((int)w)">
+        <div class="day-block" id="day-@((int)w)">
             <form method="post" asp-page-handler="Zone" class="zone-row">
                 <input type="hidden" name="day" value="@w" />
                 <span class="eyebrow">@w.ToString()[..3]</span>
                 <input class="txt" id="zone-@((int)w)" name="name" value="@Model.Zones[(int)w]" placeholder="Name this day" aria-label="@w zone name" maxlength="40" data-autosubmit />
                 <button type="submit" class="hidden-submit">Save</button>
             </form>
-            @foreach (var t in Model.Tasks.Where(t => t.Frequency == Frequency.Weekly && t.Weekday == w))
-            {
-                await TaskRow(t);
-            }
-            @{ await AddRow(Frequency.Weekly, w, $"Add a {w} task", $"add-{(int)w}"); }
+            <div class="list">
+                @foreach (var t in Model.Of(Frequency.Weekly).Where(t => t.Weekday == w))
+                {
+                    await ChoreLink(t, false);
+                }
+                @{ await AddLink($"/Chore?frequency=Weekly&weekday={w}", $"Add a {w} chore"); }
+            </div>
         </div>
     }
 </section>
 
 <section class="section" id="monthly">
-    <h2>Monthly</h2>
-    <p class="note">Pick the week and day each one lands on.</p>
-    <div class="card">
-        @foreach (var t in Model.Tasks.Where(t => t.Frequency == Frequency.Monthly))
+    <div class="group-h"><h2>Once a month</h2><span class="count">@Model.Of(Frequency.Monthly).Count()</span></div>
+    <div class="list">
+        @foreach (var t in Model.Of(Frequency.Monthly).OrderBy(t => t.WeekOfMonth).ThenBy(t => t.Weekday))
         {
-            await TaskRow(t);
+            await ChoreLink(t, true);
         }
-        @{ await AddRow(Frequency.Monthly, null, "Add a monthly task", "add-monthly"); }
+        @{ await AddLink("/Chore?frequency=Monthly", "Add a monthly chore"); }
     </div>
 </section>
 
 <section class="section" id="seasonal">
-    <h2>Seasonal</h2>
-    <p class="note">Runs in January, April, July and October.</p>
-    <div class="card">
-        @foreach (var t in Model.Tasks.Where(t => t.Frequency == Frequency.Seasonal))
+    <div class="group-h"><h2>Every season</h2><span class="count">Jan · Apr · Jul · Oct</span></div>
+    <div class="list">
+        @foreach (var t in Model.Of(Frequency.Seasonal).OrderBy(t => t.WeekOfMonth).ThenBy(t => t.Weekday))
         {
-            await TaskRow(t);
+            await ChoreLink(t, true);
         }
-        @{ await AddRow(Frequency.Seasonal, null, "Add a seasonal task", "add-seasonal"); }
+        @{ await AddLink("/Chore?frequency=Seasonal", "Add a seasonal chore"); }
+    </div>
+</section>
+
+<section class="section" id="once">
+    <div class="group-h"><h2>One-off jobs</h2><span class="count">Coming up</span></div>
+    <div class="list">
+        @foreach (var t in Model.UpcomingOnce)
+        {
+            await ChoreLink(t, true);
+        }
+        @{ await AddLink("/Chore?frequency=Once", "Add a one-off job"); }
     </div>
 </section>
 

@@ -16,11 +16,23 @@ public static class Schedule
         Frequency.Seasonal => SeasonalMonths.Contains(date.Month)
                               && task.Weekday == date.DayOfWeek
                               && task.WeekOfMonth == WeekOfMonth(date),
+        Frequency.Once => task.Date == date,
         _ => false,
     };
 
     public static bool IsBigJob(CleaningTask task) =>
         task.Frequency is Frequency.Monthly or Frequency.Seasonal;
+
+    /// <summary>How the task repeats, in words: "Every Thursday", "2nd Saturday of each month".</summary>
+    public static string Describe(CleaningTask t) => t.Frequency switch
+    {
+        Frequency.Daily => "Every day",
+        Frequency.Weekly => $"Every {t.Weekday}",
+        Frequency.Monthly => $"{Ordinal(t.WeekOfMonth ?? 1)} {t.Weekday} of each month",
+        Frequency.Seasonal => $"{Ordinal(t.WeekOfMonth ?? 1)} {t.Weekday} in Jan, Apr, Jul and Oct",
+        Frequency.Once => t.Date is { } d ? $"Just once, {d:ddd MMM d}" : "Just once",
+        _ => "",
+    };
 
     public static string Ordinal(int n) => n switch
     {

@@ -6,11 +6,13 @@ public enum Frequency
     Weekly,
     Monthly,
     Seasonal,
+    /// <summary>A one-off chore on a single <see cref="CleaningTask.Date"/>.</summary>
+    Once,
 }
 
 /// <summary>One repeating chore. Weekly tasks use <see cref="Weekday"/>;
 /// monthly and seasonal tasks use both <see cref="Weekday"/> and <see cref="WeekOfMonth"/>
-/// (for example "the 2nd Saturday").</summary>
+/// (for example "the 2nd Saturday"); one-off tasks use <see cref="Date"/>.</summary>
 public class CleaningTask
 {
     public string Id { get; set; } = NewId();
@@ -18,6 +20,8 @@ public class CleaningTask
     public Frequency Frequency { get; set; }
     public DayOfWeek? Weekday { get; set; }
     public int? WeekOfMonth { get; set; }
+    /// <summary>The day a one-off chore is due.</summary>
+    public DateOnly? Date { get; set; }
 
     public static string NewId() => Guid.NewGuid().ToString("n")[..12];
 }

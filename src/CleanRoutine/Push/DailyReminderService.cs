@@ -71,7 +71,7 @@ public class DailyReminderService(
         var daily = plan.Tasks.Count(t => t.Frequency == Frequency.Daily);
         var big = plan.Tasks.Where(t => t.Frequency is Frequency.Monthly or Frequency.Seasonal)
             .Select(t => t.Title).ToList();
-        var weekly = plan.Tasks.Where(t => t.Frequency == Frequency.Weekly).Select(t => t.Title).ToList();
+        var weekly = plan.Tasks.Where(t => t.Frequency is Frequency.Weekly or Frequency.Once).Select(t => t.Title).ToList();
 
         var parts = new List<string>();
         if (big.Count > 0) parts.Add("Bigger job: " + string.Join("; ", big));

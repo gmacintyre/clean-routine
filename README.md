@@ -4,7 +4,8 @@ A small private web app for our household cleaning routine:
 
 - **Today**: the day's checklist. Either of us can tick things off, and each item shows who did it.
 - **Calendar**: a month view. Every weekday has its zone (Monday is Kitchen, and so on), and monthly or seasonal jobs are marked with a dot.
-- **Routine**: edit the daily tasks, each day's zone and tasks, and which week and day the monthly and seasonal jobs land on.
+- **Routine**: every chore, grouped by how often it happens. Tap one to rename it, change how often it repeats (daily, weekly, monthly, seasonal or just once), move it to another day, or delete it. You can also add new chores and rename each day's zone here.
+- **One-off jobs**: add a job for a single date, from Routine or from any day's checklist.
 - **Reminders**: one push notification a day on each phone, listing that day's jobs.
 
 It's ASP.NET Core 10 Razor Pages with **no NuGet packages**. Data is one JSON file, and the app keeps a daily backup of it for 14 days. Sign-in uses a cookie with hashed passwords, and only the email addresses you list can create an account. Web push (VAPID + aes128gcm) uses .NET's built-in crypto.
@@ -92,7 +93,8 @@ The reminder time is shared by both of you and defaults to 7:30 AM. If the app w
 
 | Path | What it does |
 |---|---|
-| `Domain/Schedule.cs` | Which tasks are due on a date (daily, weekly, nth weekday of the month, seasonal in Jan/Apr/Jul/Oct) |
+| `Domain/Schedule.cs` | Which tasks are due on a date (daily, weekly, nth weekday of the month, seasonal in Jan/Apr/Jul/Oct, one-off) |
+| `Pages/Chore.cshtml` | Add or edit a chore |
 | `Domain/SeedRoutine.cs` | The starting routine, loaded on first run |
 | `Services/HouseholdStore.cs` | JSON file storage with a lock, atomic saves and daily backups |
 | `Services/AccountService.cs` | Sign-up allowlist and password checks |

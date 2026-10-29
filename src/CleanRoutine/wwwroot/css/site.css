@@ -136,6 +136,36 @@ select { width: auto; }
 .check input { width: 20px; height: 20px; accent-color: var(--accent); }
 .hidden-submit { display: none; }
 
+/* Chore lists (Routine) */
+.chore { display: flex; align-items: center; gap: 12px; padding: 13px 14px; min-height: 52px; color: var(--ink); text-decoration: none; }
+.chore + .chore { border-top: 1px solid var(--line); }
+.chore:hover { background: var(--bg); }
+.chore .t { flex: 1; min-width: 0; }
+.chore .when { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chore .chev { color: var(--muted); font-size: 20px; line-height: 1; }
+.add-chore { color: var(--accent); font-weight: 600; }
+.add-chore .plus { width: 26px; height: 26px; border-radius: 8px; border: 2px dashed var(--accent); display: grid; place-items: center; font-size: 16px; line-height: 1; flex: none; }
+.day-block { display: flex; flex-direction: column; gap: 8px; }
+
+/* Chore editor */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.label { font-size: 14px; font-weight: 600; }
+.choices { display: flex; flex-direction: column; gap: 8px; }
+.choice { display: flex; align-items: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.choice input { margin: 3px 0 0; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+.choice > span { display: flex; flex-direction: column; gap: 2px; }
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.day { position: relative; }
+.day input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.day span { display: grid; place-items: center; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-weight: 600; }
+.day input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.day input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+fieldset { border: 0; min-width: 0; }
+.danger-zone { border-color: var(--line); }
+.link-btn.danger { color: var(--danger); }
+.btn.danger { background: var(--danger); color: var(--surface); }
+
 /* Bottom tab bar */
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
