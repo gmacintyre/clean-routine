@@ -45,6 +45,24 @@ jobs:
       with:
         name: webapp
         path: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+    - name: Check Azure sign-in settings
+      shell: bash
+      env:
+        V_CLIENT: ${{ vars.CleanRoutine20261029180254_CLIENT_ID_EC6B }}
+        V_TENANT: ${{ vars.CleanRoutine20261029180254_TENANT_ID_EC6B }}
+        V_SUB: ${{ vars.CleanRoutine20261029180254_SUBSCRIPTION_ID_EC6B }}
+        S_CLIENT: ${{ secrets.CleanRoutine20261029180254_CLIENT_ID_EC6B }}
+        S_TENANT: ${{ secrets.CleanRoutine20261029180254_TENANT_ID_EC6B }}
+        S_SUB: ${{ secrets.CleanRoutine20261029180254_SUBSCRIPTION_ID_EC6B }}
+      run: |
+        # Reports only whether each value exists, never the values themselves.
+        state() { if [ -n "$1" ]; then echo set; else echo missing; fi; }
+        echo "::notice::Variables - client: $(state "$V_CLIENT"), tenant: $(state "$V_TENANT"), subscription: $(state "$V_SUB")"
+        echo "::notice::Secrets with the same names - client: $(state "$S_CLIENT"), tenant: $(state "$S_TENANT"), subscription: $(state "$S_SUB")"
+        if [ -z "$V_CLIENT" ] || [ -z "$V_TENANT" ] || [ -z "$V_SUB" ]; then
+          echo "::error::Azure sign-in values are missing. Add them as Variables (not Secrets) in Settings > Environments > CleanRoutine20261029180254_Env, using the exact names in this workflow."
+          exit 1
+        fi
     - name: Azure Login
       uses: azure/login@v2
       with:
