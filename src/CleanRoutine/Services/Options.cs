@@ -26,3 +26,10 @@ public class PushOptions
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(PublicKey) && !string.IsNullOrWhiteSpace(PrivateKey);
 }
+
+public class ReminderOptions
+{
+    /// <summary>Shared secret the scheduled GitHub job sends in the X-Reminder-Key header to wake the
+    /// app and send the daily reminder. Leave empty to turn the wake-up link off.</summary>
+    public string? TriggerKey { get; set; }
+}

@@ -7,9 +7,13 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CleanRoutine.Pages;
 
-public class SettingsModel(HouseholdStore store, WebPushSender push, DayPlanner planner, HouseholdClock clock)
+public class SettingsModel(HouseholdStore store, WebPushSender push, DayPlanner planner, HouseholdClock clock,
+    Microsoft.Extensions.Options.IOptions<ReminderOptions> reminderOptions)
     : PageModel
 {
+    /// <summary>True when the app relies on the scheduled GitHub job (Free plan), which only runs in the morning.</summary>
+    public bool UsesWakeUpJob => !string.IsNullOrWhiteSpace(reminderOptions.Value.TriggerKey);
+
     public bool PushConfigured => push.IsConfigured;
     public string? PublicKey => push.PublicKey;
     public ReminderSettings Reminders { get; private set; } = new();

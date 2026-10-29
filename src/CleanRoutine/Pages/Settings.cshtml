@@ -24,6 +24,10 @@
         </label>
         <div><button class="btn" type="submit">Save</button></div>
         <p class="note">This time applies to both of you.</p>
+        @if (Model.UsesWakeUpJob)
+        {
+            <p class="note">Pick a time between 5:00 AM and 11:30 AM. The app is on Azure's free plan, so a scheduled job wakes it up during those hours to send the reminder. It can arrive up to about 20 minutes after the time you set.</p>
+        }
     </form>
 </section>
 

@@ -23,9 +23,11 @@ Open http://localhost:5103 and create an account with `you@example.com` (the dev
 
 To try notifications locally, generate keys (see step 3 below) and put them in `appsettings.Development.json` under `Push`. Browsers allow push on `localhost` without HTTPS.
 
-## Deploy to Azure App Service
+## Deploy to Azure App Service (Free plan)
 
-This runs as a second web app on the same App Service plan as the tea recipe app, so it usually adds no hosting cost.
+The app runs on Azure's **Free (F1)** plan, which costs nothing. It gets its own plan, separate from the tea recipe app's B1 plan.
+
+The Free plan puts the app to sleep after about 20 minutes with no visits, so the first visit after that takes 10–30 seconds to load. A sleeping app also can't send the morning reminder. A scheduled GitHub Actions job solves this (step 7): it wakes the app every 15 minutes through the morning, and the app sends the reminder once its time has passed.
 
 ### 1. Create the web app
 
@@ -33,16 +35,17 @@ In the Azure portal: **Create a resource → Web App**
 
 - **Publish:** Code
 - **Runtime stack:** .NET 10 (LTS)
-- **Operating system and region:** the same as the existing plan
-- **Pricing plan:** pick the tea app's existing App Service plan
+- **Operating system:** Linux
+- **Pricing plan:** click **Create new**, then under **Explore pricing plans** choose **Free F1**
 
 ### 2. Turn on these settings
 
 In the new web app, open **Settings → Configuration → General settings**:
 
-- **Always On: On.** Without it the app goes to sleep and the daily reminder doesn't go out. This needs a Basic (B1) plan or higher; the Free and Shared tiers don't offer it.
 - **HTTPS Only: On**
 - **SCM Basic Auth Publishing Credentials: On.** The GitHub deploy below uses a publish profile, which needs this.
+
+Always On isn't available on the Free plan. The wake-up job in step 7 takes its place.
 
 ### 3. Generate notification keys
 
@@ -67,6 +70,7 @@ In **Settings → Environment variables → App settings**, add:
 | `Push__PublicKey` | public key from step 3 |
 | `Push__PrivateKey` | private key from step 3 |
 | `Push__Subject` | `mailto:` followed by your email |
+| `Reminders__TriggerKey` | a long random password you make up; it's also used in step 7 |
 
 Data is saved to `%HOME%/data/clean-routine/household.json`. That's App Service's persistent storage, so it survives restarts and redeploys.
 
@@ -87,7 +91,37 @@ Until those two values are set, the workflow only builds and skips the deploy.
    **Android:** in Chrome, tap the menu and choose **Add to Home screen** or **Install app**.
 3. Go to **Reminders → Turn on notifications**, allow them, and tap **Send a test**.
 
-The reminder time is shared by both of you and defaults to 7:30 AM. If the app was down at reminder time, it still sends the reminder once it's back, as long as that's before 9 PM.
+The reminder time is shared by both of you and defaults to 7:30 AM.
+
+### 7. Turn on the morning wake-up job
+
+The **Daily reminder wake-up** workflow (`.github/workflows/reminder.yml`) calls the app every 15 minutes from 5 AM to about noon Eastern. Each call wakes the app and sends the day's reminder once the reminder time has passed. Later calls that day do nothing.
+
+In this GitHub repo, go to **Settings → Secrets and variables → Actions**:
+
+- Under **Secrets**, add `REMINDER_TRIGGER_KEY` with the same value as the `Reminders__TriggerKey` app setting.
+- Under **Variables**, add `CLEAN_ROUTINE_URL` with the app's address, like `https://your-app-name.azurewebsites.net`.
+
+To check it, open the **Actions** tab, choose **Daily reminder wake-up → Run workflow**, and open the run. Its log ends with a status:
+
+| Status | Meaning |
+|---|---|
+| `sent` | The reminder went out |
+| `already-sent` | It already went out today |
+| `not-yet` | The reminder time hasn't come yet |
+| `no-devices` | No phone has notifications turned on |
+| `disabled` | Reminders are switched off in the app |
+| `push-not-configured` | The `Push__` keys are missing |
+
+A 401 error means the key in GitHub doesn't match the app setting.
+
+Things to know:
+
+- **Pick a reminder time between 5:00 AM and 11:30 AM.** The job only runs in the morning. A reminder can arrive up to about 20 minutes after the time you set, because the job runs every 15 minutes and GitHub sometimes starts scheduled jobs a few minutes late.
+- **In a public repo, GitHub turns off scheduled jobs after 60 days with no commits.** It emails you first, and you can turn the job back on from the Actions tab. A private repo doesn't have this limit, but each run counts against the free 2,000 Actions minutes a month. This job uses about 960 a month.
+- **The wake-up calls also keep the app awake in the morning,** so it loads quickly then.
+
+To move to a paid plan later, scale the plan up to B1 and turn on **Always On**. The app's own timer then sends the reminder at any time of day, and you can delete the wake-up job.
 
 ## Where things live
 
@@ -99,7 +133,8 @@ The reminder time is shared by both of you and defaults to 7:30 AM. If the app w
 | `Services/HouseholdStore.cs` | JSON file storage with a lock, atomic saves and daily backups |
 | `Services/AccountService.cs` | Sign-up allowlist and password checks |
 | `Push/WebPushCrypto.cs` | VAPID signing and payload encryption |
-| `Push/DailyReminderService.cs` | Sends the daily reminder |
+| `Push/DailyReminderService.cs` | Sends the daily reminder (from the app's timer or the wake-up link) |
+| `.github/workflows/reminder.yml` | Morning wake-up job for the Free plan |
 | `wwwroot/sw.js`, `manifest.webmanifest` | Home-screen app and notification display |
 
 ## Backups

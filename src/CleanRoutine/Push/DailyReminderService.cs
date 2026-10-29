@@ -5,8 +5,9 @@ using CleanRoutine.Services;
 namespace CleanRoutine.Push;
 
 /// <summary>
-/// Checks once a minute and sends the day's reminder once the household's reminder time has passed.
-/// Needs the App Service "Always On" setting so the app isn't asleep at that time.
+/// Sends the day's reminder once the household's reminder time has passed, at most once a day.
+/// While the app is awake it checks every minute. On the Free plan the app sleeps when idle, so a
+/// scheduled GitHub Actions job also calls POST /api/reminders/run to wake it (see Program.cs).
 /// </summary>
 public class DailyReminderService(
     HouseholdStore store,
@@ -31,7 +32,7 @@ public class DailyReminderService(
         {
             try
             {
-                await TickAsync(stoppingToken);
+                await RunIfDueAsync(stoppingToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -40,27 +41,36 @@ public class DailyReminderService(
         } while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    private async Task TickAsync(CancellationToken ct)
+    /// <summary>Send today's reminder if it's due and hasn't gone out yet. Safe to call any number of times.</summary>
+    /// <returns>What happened, as a short status word.</returns>
+    public async Task<string> RunIfDueAsync(CancellationToken ct = default)
     {
+        if (!sender.IsConfigured) return "push-not-configured";
+
         var now = clock.Now;
         var today = DateOnly.FromDateTime(now);
         var time = TimeOnly.FromDateTime(now);
 
-        // Claim today's reminder before sending, so a slow send can't cause a second one.
-        var shouldSend = await store.WriteAsync(d =>
+        // Claim today's reminder before sending, so two callers at once (the timer and the
+        // wake-up job) can't both send it. The store's lock makes this check-and-set atomic.
+        var status = await store.WriteAsync(d =>
         {
             var r = d.Reminders;
-            if (!r.Enabled || r.LastSentDate == today || time < r.Time || now.Hour > LatestCatchUpHour) return false;
-            if (d.PushSubscriptions.Count == 0) return false;
+            if (!r.Enabled) return "disabled";
+            if (r.LastSentDate == today) return "already-sent";
+            if (time < r.Time) return "not-yet";
+            if (now.Hour > LatestCatchUpHour) return "too-late";
+            if (d.PushSubscriptions.Count == 0) return "no-devices";
             r.LastSentDate = today;
-            return true;
+            return "send";
         });
-        if (!shouldSend) return;
+        if (status != "send") return status;
 
         var plan = await planner.GetDayAsync(today);
         var result = await sender.SendAsync(Compose(plan), ct: ct);
         log.LogInformation("Daily reminder for {Date}: {Sent} sent, {Removed} removed, {Failed} failed.",
             today, result.Sent, result.Removed, result.Failed);
+        return "sent";
     }
 
     public static PushMessage Compose(DayPlan plan)

@@ -1,0 +1,35 @@
+name: Daily reminder wake-up
+
+# The cleaning app runs on Azure's Free plan, which sleeps when nobody is using it, so its own
+# timer can't send the morning reminder. This job calls the app every 15 minutes through the
+# morning. Each call wakes the app; the app sends the reminder only once its reminder time has
+# passed, and only once a day. Calls before then do nothing.
+#
+# Times are UTC: 09:00-16:45 UTC is 5:00 AM-12:45 PM Eastern in summer and 4:00-11:45 AM in winter.
+# GitHub can start scheduled jobs a few minutes late.
+
+on:
+  schedule:
+    - cron: "*/15 9-16 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Does nothing until the app address is set (see README, "Free plan wake-up").
+    if: vars.CLEAN_ROUTINE_URL != ''
+    steps:
+      - name: Wake the app and send today's reminder if it's due
+        env:
+          APP_URL: ${{ vars.CLEAN_ROUTINE_URL }}
+          REMINDER_KEY: ${{ secrets.REMINDER_TRIGGER_KEY }}
+        run: |
+          # A sleeping app can take 20-60 seconds to start, so allow a long wait and retry.
+          curl --fail-with-body --silent --show-error \
+            --max-time 120 --retry 3 --retry-delay 15 --retry-all-errors \
+            -X POST -H "X-Reminder-Key: $REMINDER_KEY" \
+            "${APP_URL%/}/api/reminders/run"
+          echo
