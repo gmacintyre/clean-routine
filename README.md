@@ -75,15 +75,25 @@ Data is saved to `%HOME%/data/clean-routine/household.json`. That's App Service'
 
 ### 5. Automatic deploys from GitHub
 
-Deploys use the workflow Visual Studio created when publishing (`.github/workflows/CleanRoutine20261029180254.yml`), like the tea recipe app's. It signs in to Azure with a managed identity instead of a stored password, and runs on every push to `main`.
+Deploys use the workflow Visual Studio created (`.github/workflows/CleanRoutine20261029180254.yml`) and run on every push to `main`. GitHub signs in to Azure through a Microsoft Entra **app registration** with no stored password, the same way the tea recipe app does. These pieces have to be in place:
 
-It needs three variables in the repo's **Settings → Environments → CleanRoutine20261029180254_Env**:
+1. **App registration:** Microsoft Entra ID → App registrations → **CleanRoutine**.
+2. **Federated credential** on that registration (Certificates & secrets → Federated credentials), for GitHub Actions with the entity type **Environment** and the name `CleanRoutine20261029180254_Env`. This repo sends the subject with IDs, so it must read exactly:
+   `repo:gmacintyre@3603168/clean-routine@1438788421:environment:CleanRoutine20261029180254_Env`
+3. **Role:** the registration's service principal needs a role (for example Contributor) in **Access control (IAM)** on the subscription or the app's resource group. Add it under "User, group, or service principal", not Managed identity.
+4. **GitHub environment variables** in Settings → Environments → `CleanRoutine20261029180254_Env`:
+   - `CleanRoutine20261029180254_CLIENT_ID_EC6B`: the registration's Application (client) ID
+   - `CleanRoutine20261029180254_TENANT_ID_EC6B`: the Directory (tenant) ID
+   - `CleanRoutine20261029180254_SUBSCRIPTION_ID_EC6B`: the Subscription ID
 
-- `CleanRoutine20261029180254_CLIENT_ID_EC6B`: the **Client ID** of the managed identity Visual Studio created (search for "Managed Identities" in the portal; it's named after the app)
-- `CleanRoutine20261029180254_TENANT_ID_EC6B`: your **Directory (tenant) ID**, the same value as the tea app's `..._TENANT_ID_...` variable
-- `CleanRoutine20261029180254_SUBSCRIPTION_ID_EC6B`: your **Subscription ID**, the same value as the tea app's
+If the deploy fails at **Azure Login**, the step before it lists which variables it found. Then read the error:
 
-If the **Azure Login** step fails with "Not all values are present", one of these is missing.
+| Error | Fix |
+|---|---|
+| "Not all values are present" | A variable in step 4 is missing or misnamed |
+| AADSTS70025 "no configured federated identity credentials" | Step 2 is missing, or the client ID points at a different identity |
+| AADSTS700213 "No matching federated identity record" | The subject in step 2 doesn't match. Copy it from the error message. |
+| "No subscriptions found" | Step 3: the role is missing or hasn't applied yet (wait about 5 minutes) |
 
 ### 6. Set up each phone
 
