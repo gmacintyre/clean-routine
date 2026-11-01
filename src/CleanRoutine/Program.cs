@@ -29,6 +29,8 @@ builder.Services.Configure<PushOptions>(builder.Configuration.GetSection("Push")
 builder.Services.Configure<SiteOptions>(builder.Configuration.GetSection("Site"));
 builder.Services.Configure<AdsOptions>(builder.Configuration.GetSection("Ads"));
 builder.Services.Configure<BillingOptions>(builder.Configuration.GetSection("Billing"));
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
+builder.Services.AddSingleton<EmailSender>();
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<HouseholdClock>();
@@ -75,8 +77,16 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
                 await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                 return;
             }
-            // Cookies from before households existed, or after joining another household: refresh the claims.
-            if (ctx.Principal!.FindFirst(AccountService.HouseholdClaim)?.Value != user.HouseholdId
+            // Password changed since this cookie was issued (a reset): sign this device out.
+            var stamp = ctx.Principal!.FindFirst(AccountService.StampClaim)?.Value;
+            if (stamp is not null && stamp != user.SecurityStamp)
+            {
+                ctx.RejectPrincipal();
+                await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                return;
+            }
+            // Cookies from before households or stamps existed, or after joining another household: refresh the claims.
+            if (stamp is null || ctx.Principal.FindFirst(AccountService.HouseholdClaim)?.Value != user.HouseholdId
                 || ctx.Principal.Identity?.Name != user.DisplayName)
             {
                 ctx.ReplacePrincipal(AccountService.ToPrincipal(user));
@@ -92,9 +102,12 @@ builder.Services.AddAuthorizationBuilder()
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    o.AddPolicy("signin", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(5) }));
+    // Counts form submissions (sign-in, sign-up, password reset), not page views.
+    o.AddPolicy("signin", ctx => HttpMethods.IsGet(ctx.Request.Method)
+        ? RateLimitPartition.GetNoLimiter("get")
+        : RateLimitPartition.GetFixedWindowLimiter(
+            ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(5) }));
     o.AddFixedWindowLimiter("wake", x =>
     {
         x.PermitLimit = 20;

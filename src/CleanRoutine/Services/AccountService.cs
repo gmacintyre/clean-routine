@@ -1,17 +1,22 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using CleanRoutine.Domain;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 
 namespace CleanRoutine.Services;
 
-public record SignedInUser(string Id, string DisplayName, string Email, string HouseholdId);
+public record SignedInUser(string Id, string DisplayName, string Email, string HouseholdId, string SecurityStamp);
 
 /// <summary>Sign-up, sign-in and households. Anyone can sign up: they either start a new household
 /// (which gets the starter routine) or join an existing one through its invite link.</summary>
 public class AccountService(AccountStore accounts, HouseholdStore households, IPasswordHasher<AppUser> hasher)
 {
     public const int MinPasswordLength = 8;
+    public static readonly TimeSpan ResetLinkLifetime = TimeSpan.FromHours(1);
+    /// <summary>A new reset email isn't sent sooner than this after the last one, so the form can't flood an inbox.</summary>
+    private static readonly TimeSpan ResetResendGap = TimeSpan.FromMinutes(2);
     public const int MaxMembers = 12;
 
     /// <summary>The household an invite code belongs to, or null.</summary>
@@ -61,7 +66,7 @@ public class AccountService(AccountStore accounts, HouseholdStore households, IP
                 d.Households.Add(household);
             }
 
-            var user = new AppUser { Email = email, DisplayName = name, PasswordHash = hash, HouseholdId = household.Id };
+            var user = new AppUser { Email = email, DisplayName = name, PasswordHash = hash, HouseholdId = household.Id, SecurityStamp = AppUser.NewStamp() };
             d.Users.Add(user);
             return (ToSignedIn(user), null);
         });
@@ -71,7 +76,7 @@ public class AccountService(AccountStore accounts, HouseholdStore households, IP
     {
         var user = await accounts.ReadAsync(d => d.Users.FirstOrDefault(u =>
             string.Equals(u.Email, email.Trim(), StringComparison.OrdinalIgnoreCase)) is { } u
-            ? new AppUser { Id = u.Id, Email = u.Email, DisplayName = u.DisplayName, PasswordHash = u.PasswordHash, HouseholdId = u.HouseholdId }
+            ? new AppUser { Id = u.Id, Email = u.Email, DisplayName = u.DisplayName, PasswordHash = u.PasswordHash, HouseholdId = u.HouseholdId, SecurityStamp = u.SecurityStamp }
             : null);
         if (user is null)
         {
@@ -91,6 +96,52 @@ public class AccountService(AccountStore accounts, HouseholdStore households, IP
 
         return ToSignedIn(user);
     }
+
+    /// <summary>Make a password-reset token for the account with this email. Returns null when there's no
+    /// such account, or a link was sent in the last two minutes. Only a hash of the token is stored.</summary>
+    public Task<(string UserId, string Name, string Email, string Token)?> StartResetAsync(string email, DateTimeOffset now) =>
+        accounts.WriteAsync<(string, string, string, string)?>(d =>
+        {
+            var user = d.Users.FirstOrDefault(u => string.Equals(u.Email, email.Trim(), StringComparison.OrdinalIgnoreCase));
+            if (user is null) return null;
+            if (user.ResetTokenExpires is { } exp && exp - ResetLinkLifetime + ResetResendGap > now) return null;
+
+            var token = Base64Url(RandomNumberGenerator.GetBytes(32));
+            user.ResetTokenHash = HashToken(token);
+            user.ResetTokenExpires = now + ResetLinkLifetime;
+            return (user.Id, user.DisplayName, user.Email, token);
+        });
+
+    /// <summary>True when the link is still good (for showing the form).</summary>
+    public Task<bool> IsResetValidAsync(string? userId, string? token, DateTimeOffset now) =>
+        accounts.ReadAsync(d => d.Users.FirstOrDefault(u => u.Id == userId) is { } u && TokenMatches(u, token, now));
+
+    /// <summary>Set a new password from a reset link. The link stops working, and every other device is signed out.</summary>
+    public async Task<(SignedInUser? User, string? Error)> ResetPasswordAsync(string? userId, string? token, string password, DateTimeOffset now)
+    {
+        if (password.Length < MinPasswordLength)
+            return (null, $"Use at least {MinPasswordLength} characters for the password.");
+        var hash = hasher.HashPassword(new AppUser(), password);
+        return await accounts.WriteAsync<(SignedInUser?, string?)>(d =>
+        {
+            var user = d.Users.FirstOrDefault(u => u.Id == userId);
+            if (user is null || !TokenMatches(user, token, now))
+                return (null, "That reset link has expired or was already used. Ask for a new one.");
+            user.PasswordHash = hash;
+            user.SecurityStamp = AppUser.NewStamp();
+            user.ResetTokenHash = null;
+            user.ResetTokenExpires = null;
+            return (ToSignedIn(user), null);
+        });
+    }
+
+    private static bool TokenMatches(AppUser u, string? token, DateTimeOffset now) =>
+        !string.IsNullOrEmpty(token) && u.ResetTokenHash is { } stored && u.ResetTokenExpires > now
+        && CryptographicOperations.FixedTimeEquals(Convert.FromHexString(stored), Convert.FromHexString(HashToken(token)));
+
+    private static string HashToken(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+
+    private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     public Task<SignedInUser?> FindAsync(string userId) =>
         accounts.ReadAsync(d => d.Users.FirstOrDefault(u => u.Id == userId) is { } u ? ToSignedIn(u) : null);
@@ -156,9 +207,10 @@ public class AccountService(AccountStore accounts, HouseholdStore households, IP
         h.StripeSubscriptionId is not null && !h.SubscriptionEnding
         && h.SubscriptionStatus is not ("canceled" or "incomplete_expired" or "unpaid");
 
-    private static SignedInUser ToSignedIn(AppUser u) => new(u.Id, u.DisplayName, u.Email, u.HouseholdId);
+    private static SignedInUser ToSignedIn(AppUser u) => new(u.Id, u.DisplayName, u.Email, u.HouseholdId, u.SecurityStamp);
 
     public const string HouseholdClaim = "hid";
+    public const string StampClaim = "ss";
 
     public static ClaimsPrincipal ToPrincipal(SignedInUser user) =>
         new(new ClaimsIdentity(
@@ -167,6 +219,7 @@ public class AccountService(AccountStore accounts, HouseholdStore households, IP
             new Claim(ClaimTypes.Name, user.DisplayName),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(HouseholdClaim, user.HouseholdId),
+            new Claim(StampClaim, user.SecurityStamp),
         ], CookieAuthenticationDefaults.AuthenticationScheme));
 }
 

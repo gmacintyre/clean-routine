@@ -7,9 +7,8 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace CleanRoutine.Pages.Account;
 
 [EnableRateLimiting("signin")]
-public class LoginModel(AccountService accounts, Microsoft.Extensions.Options.IOptions<SiteOptions> site) : PageModel
+public class LoginModel(AccountService accounts) : PageModel
 {
-    public string ContactEmail => site.Value.ContactEmail;
     [BindProperty] public string Email { get; set; } = "";
     [BindProperty] public string Password { get; set; } = "";
     public string? Error { get; private set; }

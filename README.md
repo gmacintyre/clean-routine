@@ -36,6 +36,8 @@ Open http://localhost:5103, choose **Get started free** and create an account. L
 
 To try notifications locally, generate keys (see step 3 below) and put them in `appsettings.Development.json` under `Push`. Browsers allow push on `localhost` without HTTPS.
 
+To try password reset locally without email, choose **Forgot your password?**: in Development the reset link is written to the console instead of being emailed.
+
 To try payments locally, use Stripe test keys and the Stripe CLI: `stripe listen --forward-to localhost:5103/api/stripe/webhook` prints a `whsec_…` secret to use as `Billing__StripeWebhookSecret`. Pay with card `4242 4242 4242 4242`.
 
 ## Launch checklist (things only the owner can do)
@@ -46,7 +48,7 @@ To try payments locally, use Stripe test keys and the Stripe CLI: `stripe listen
 4. **Google AdSense:** apply with the domain, set up the consent message for EU/UK visitors (AdSense → Privacy & messaging), create three display ad units, and add the ids as app settings (below). The welcome page, privacy policy and terms are public so the review has content to look at.
 5. **Stripe:** create an account, a product "Clean Routine ad-free" with a price, a webhook, and turn on the customer portal (below).
 6. **Privacy policy and terms:** the app has drafts at `/Privacy` and `/Terms`. Fill in `Site__OperatorName` and `Site__ContactEmail`, and have them reviewed.
-7. **Password resets:** there's no email sending yet, so the sign-in page asks people to email `Site__ContactEmail`. Adding an email service (Azure Communication Services or SendGrid) for self-serve resets is the next step once people are signing up.
+7. **Email for password resets:** set up an email service with SMTP (Azure Communication Services Email is the easy choice on Azure; Brevo, Postmark or Mailgun also work), send from your own domain, and add the `Email__…` settings (below). Until then, "Forgot your password?" asks people to email `Site__ContactEmail`.
 
 ## Deploy to Azure App Service
 
@@ -87,7 +89,11 @@ In **Settings → Environment variables → App settings**, add these. Each name
 | `Push__PublicKey` / `Push__PrivateKey` | from step 3 |
 | `Push__Subject` | `mailto:` followed by your email |
 | `Site__OperatorName` | your name or business name, shown on the privacy policy and terms |
-| `Site__ContactEmail` | where people write for help and password resets |
+| `Site__ContactEmail` | where people write for help |
+| `Site__BaseUrl` | the app's public address, e.g. `https://cleanroutine.app`, used in reset-email links |
+| `Email__SmtpHost` / `Email__SmtpPort` | SMTP server and port (587, STARTTLS), e.g. `smtp.azurecomm.net` |
+| `Email__SmtpUser` / `Email__SmtpPassword` | SMTP sign-in from your email service |
+| `Email__From` | sender address the service allows, e.g. `DoNotReply@cleanroutine.app` |
 | `Ads__AdSenseClientId` | `ca-pub-…` from AdSense |
 | `Ads__Slots__today` / `Ads__Slots__calendar` / `Ads__Slots__routine` | the ad unit ids (the `data-ad-slot` numbers) |
 | `Billing__StripeSecretKey` | `sk_live_…` (or `sk_test_…` while testing) |
@@ -153,7 +159,9 @@ On the Free plan the app sleeps, so the **Daily reminder wake-up** workflow call
 | `Services/HouseholdStore.cs` | Each household's chores and ticks (`households/{id}.json`) |
 | `Services/Storage.cs` | Shared JSON file handling: locking, atomic saves, daily backups |
 | `Services/DataMigration.cs` | One-time move from the original single `household.json` |
-| `Services/AccountService.cs` | Sign-up, invites, joining and deleting accounts |
+| `Services/AccountService.cs` | Sign-up, invites, password reset, joining and deleting accounts |
+| `Services/EmailSender.cs` | Sends email over SMTP |
+| `Pages/Account/Forgot.cshtml`, `Reset.cshtml` | Forgot password: one-time links that expire after an hour and sign out other devices |
 | `Billing/StripeBilling.cs` | Stripe Checkout, customer portal and webhook |
 | `Pages/Shared/_Ad.cshtml` | The ad spot (AdSense unit or "go ad-free" card) |
 | `Pages/Premium.cshtml` | The ad-free page |

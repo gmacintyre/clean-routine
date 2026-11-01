@@ -42,6 +42,13 @@ public class AppUser
     public string PasswordHash { get; set; } = "";
     public string HouseholdId { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+    /// <summary>Changes when the password changes, which signs the account out everywhere else.</summary>
+    public string SecurityStamp { get; set; } = "";
+    /// <summary>SHA-256 of the current password-reset token. The token itself is only in the email.</summary>
+    public string? ResetTokenHash { get; set; }
+    public DateTimeOffset? ResetTokenExpires { get; set; }
+
+    public static string NewStamp() => Guid.NewGuid().ToString("n");
 }
 
 public enum Plan

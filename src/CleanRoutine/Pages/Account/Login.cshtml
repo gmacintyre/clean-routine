@@ -26,8 +26,5 @@
         <button class="btn" type="submit">Sign in</button>
     </form>
     <p class="note">First time here? <a asp-page="Register" asp-route-invite="@Model.Invite">Create your account</a></p>
-    @if (!string.IsNullOrWhiteSpace(Model.ContactEmail))
-    {
-        <p class="note">Forgot your password? Email <a href="mailto:@Model.ContactEmail">@Model.ContactEmail</a> from your account's address and we'll reset it.</p>
-    }
+    <p class="note"><a asp-page="Forgot">Forgot your password?</a></p>
 </div>

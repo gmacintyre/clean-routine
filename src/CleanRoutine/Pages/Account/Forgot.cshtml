@@ -1,0 +1,44 @@
+@page
+@model CleanRoutine.Pages.Account.ForgotModel
+@{
+    ViewData["Title"] = "Forgot password";
+}
+
+<div class="auth">
+    <div class="dayhead">
+        <span class="eyebrow">Clean Routine</span>
+        <h1>Forgot your password?</h1>
+    </div>
+    @if (!Model.CanEmail)
+    {
+        <div class="card">
+            @if (string.IsNullOrWhiteSpace(Model.ContactEmail))
+            {
+                <p>Password resets aren't available yet.</p>
+            }
+            else
+            {
+                <p>Email <a href="mailto:@Model.ContactEmail">@Model.ContactEmail</a> from your account's address and we'll reset it.</p>
+            }
+        </div>
+    }
+    else if (Model.Sent)
+    {
+        <div class="card">
+            <p class="ok-banner" role="status">If there's an account for @Model.Email, we've sent it a link to choose a new password.</p>
+            <p class="note">The link works for one hour. Check your spam folder if it doesn't arrive in a few minutes.</p>
+        </div>
+    }
+    else
+    {
+        <form method="post" class="card">
+            <p class="note">Enter the email you signed up with and we'll send you a link to choose a new password.</p>
+            <div class="field">
+                <label for="Email">Email</label>
+                <input class="txt" asp-for="Email" type="email" autocomplete="username" required autofocus maxlength="254" />
+            </div>
+            <button class="btn" type="submit">Send reset link</button>
+        </form>
+    }
+    <p class="note"><a asp-page="Login">Back to sign in</a></p>
+</div>

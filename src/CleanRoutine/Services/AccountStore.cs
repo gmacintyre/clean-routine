@@ -7,7 +7,15 @@ namespace CleanRoutine.Services;
 /// (<see cref="HouseholdStore"/>).</summary>
 public sealed class AccountStore(DataPaths paths, ILogger<AccountStore> log)
 {
-    private readonly JsonFile<AccountsData> _file = new(paths.AccountsFile, paths.BackupsDirectory, log);
+    private readonly JsonFile<AccountsData> _file = new(paths.AccountsFile, paths.BackupsDirectory, log, GiveStamps);
+
+    /// <summary>Accounts from before security stamps existed get one, saved once so it stays the same.</summary>
+    private static bool GiveStamps(AccountsData data)
+    {
+        var missing = data.Users.Where(u => string.IsNullOrEmpty(u.SecurityStamp)).ToList();
+        foreach (var u in missing) u.SecurityStamp = AppUser.NewStamp();
+        return missing.Count > 0;
+    }
 
     public bool Exists => File.Exists(paths.AccountsFile);
 
