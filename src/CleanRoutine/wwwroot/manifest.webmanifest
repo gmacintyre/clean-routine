@@ -1,12 +1,12 @@
 {
-  "name": "Clean Routine",
-  "short_name": "Cleaning",
-  "description": "Our daily cleaning checklist and calendar",
+  "name": "Make a Home",
+  "short_name": "Make a Home",
+  "description": "Make your house a home.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#F1F4F1",
-  "theme_color": "#2D6A56",
+  "background_color": "#FFF8EC",
+  "theme_color": "#2F5DA8",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },

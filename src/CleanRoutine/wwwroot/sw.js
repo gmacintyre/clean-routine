@@ -3,7 +3,7 @@ self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
 self.addEventListener("push", (event) => {
-  let msg = { title: "Clean Routine", body: "Today's checklist is ready.", url: "/", tag: "daily" };
+  let msg = { title: "Make a Home", body: "Rise and shine! Today's list is ready.", url: "/", tag: "daily" };
   try {
     if (event.data) msg = { ...msg, ...event.data.json() };
   } catch {

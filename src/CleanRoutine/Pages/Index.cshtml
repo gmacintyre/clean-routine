@@ -64,7 +64,7 @@ else
         <div class="bar"><i id="bar" style="width:@pct%"></i></div>
     </div>
     <div class="alldone" id="alldone" @(p.DoneCount == total ? "" : "hidden")>
-        @(d == Model.Today ? "All done for today. Nice work." : "Everything on this day was checked off.")
+        @(d == Model.Today ? "All tidy! Go put your feet up." : "Everything on this day was checked off.")
     </div>
 
     @foreach (var g in groups)
