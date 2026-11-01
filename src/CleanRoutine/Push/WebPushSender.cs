@@ -21,13 +21,14 @@ public class WebPushSender(
     public bool IsConfigured => options.Value.IsConfigured;
     public string? PublicKey => options.Value.PublicKey;
 
-    /// <summary>Send to every saved device, or only one person's devices when <paramref name="userId"/> is set.
+    /// <summary>Send to every device in the household, or only one person's devices when <paramref name="userId"/> is set.
     /// Devices the push service says are gone (404/410) are removed.</summary>
-    public async Task<PushResult> SendAsync(PushMessage message, string? userId = null, CancellationToken ct = default)
+    public async Task<PushResult> SendAsync(string householdId, PushMessage message, string? userId = null,
+        CancellationToken ct = default)
     {
         if (!IsConfigured) return new PushResult(0, 0, 0);
 
-        var subs = await store.ReadAsync(d => d.PushSubscriptions
+        var subs = await store.ReadAsync(householdId, d => d.PushSubscriptions
             .Where(s => userId is null || s.UserId == userId)
             .Select(s => new PushSubscriptionRecord
                 { Id = s.Id, Endpoint = s.Endpoint, P256dh = s.P256dh, Auth = s.Auth })
@@ -76,7 +77,7 @@ public class WebPushSender(
         }
 
         if (gone.Count > 0)
-            await store.WriteAsync(d => d.PushSubscriptions.RemoveAll(s => gone.Contains(s.Id)));
+            await store.WriteAsync(householdId, d => d.PushSubscriptions.RemoveAll(s => gone.Contains(s.Id)));
 
         return new PushResult(sent, gone.Count, failed);
     }

@@ -7,7 +7,7 @@ namespace CleanRoutine.Pages;
 
 /// <summary>All chores, grouped by how often they happen. Chores are added and edited on the Chore page;
 /// day zones are renamed here.</summary>
-public class RoutineModel(HouseholdStore store, HouseholdClock clock) : PageModel
+public class RoutineModel(HouseholdStore store, HouseholdClock clock, CurrentHousehold household) : PageModel
 {
     public List<CleaningTask> Tasks { get; private set; } = [];
     public string[] Zones { get; private set; } = new string[7];
@@ -21,8 +21,9 @@ public class RoutineModel(HouseholdStore store, HouseholdClock clock) : PageMode
 
     public async Task OnGetAsync()
     {
-        Today = clock.Today;
-        (Tasks, Zones) = await store.ReadAsync(d => (
+        var h = await household.GetAsync();
+        Today = clock.Today(h.TimeZone);
+        (Tasks, Zones) = await store.ReadAsync(h.Id, d => (
             d.Tasks.Select(t => new CleaningTask
             {
                 Id = t.Id, Title = t.Title, Frequency = t.Frequency, Weekday = t.Weekday,
@@ -35,7 +36,7 @@ public class RoutineModel(HouseholdStore store, HouseholdClock clock) : PageMode
     {
         if (!Enum.IsDefined(day)) return BadRequest();
         name = (name ?? "").Trim();
-        await store.WriteAsync(d => d.Zones[(int)day] = name.Length > 40 ? name[..40] : name);
+        await store.WriteAsync(User.HouseholdId(), d => d.Zones[(int)day] = name.Length > 40 ? name[..40] : name);
         TempData["Toast"] = name.Length > 0 ? $"{day} is now {name} day" : $"Cleared {day}'s name";
         return Redirect($"/Routine#day-{(int)day}");
     }

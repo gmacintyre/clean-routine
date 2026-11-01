@@ -1,0 +1,33 @@
+@*
+    One ad spot. Pass the placement name ("today", "calendar" or "routine") as the model.
+    Shows nothing for ad-free households. Shows an AdSense unit when one is set up for this placement,
+    otherwise a small "go ad-free" card (turn that off with Ads__HouseAds=false).
+    Ads sit below the content, away from checkboxes and buttons, so they can't be tapped by mistake.
+*@
+@model string
+@using CleanRoutine.Services
+@inject CurrentHousehold Household
+@inject Microsoft.Extensions.Options.IOptions<AdsOptions> AdsConfig
+@{
+    var ads = AdsConfig.Value;
+    if (!await Household.ShowAdsAsync()) return;
+    var slot = ads.AdSenseConfigured ? ads.Slots.GetValueOrDefault(Model) : null;
+}
+@if (!string.IsNullOrWhiteSpace(slot))
+{
+    <aside class="ad" aria-label="Advertisement">
+        <span class="ad-label">Advertisement</span>
+        <ins class="adsbygoogle" style="display:block" data-ad-client="@ads.AdSenseClientId" data-ad-slot="@slot"
+             data-ad-format="auto" data-full-width-responsive="true"></ins>
+        <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+        <a class="ad-remove" href="/Premium">Remove ads</a>
+    </aside>
+}
+else if (ads.HouseAds)
+{
+    <aside class="ad house" aria-label="Go ad-free">
+        <span class="ad-label">Clean Routine</span>
+        <p><strong>Enjoying the app?</strong> Go ad-free for your whole household and help keep it running.</p>
+        <a class="btn secondary" href="/Premium">See ad-free</a>
+    </aside>
+}

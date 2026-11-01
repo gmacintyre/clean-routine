@@ -10,6 +10,7 @@
         <h1>Sign in</h1>
     </div>
     <form method="post" class="card">
+        <input type="hidden" asp-for="Invite" />
         @if (Model.Error is not null)
         {
             <p class="error" role="alert">@Model.Error</p>
@@ -24,8 +25,9 @@
         </div>
         <button class="btn" type="submit">Sign in</button>
     </form>
-    @if (Model.SignUpOpen)
+    <p class="note">First time here? <a asp-page="Register" asp-route-invite="@Model.Invite">Create your account</a></p>
+    @if (!string.IsNullOrWhiteSpace(Model.ContactEmail))
     {
-        <p class="note">First time here? <a asp-page="Register">Create your account</a></p>
+        <p class="note">Forgot your password? Email <a href="mailto:@Model.ContactEmail">@Model.ContactEmail</a> from your account's address and we'll reset it.</p>
     }
 </div>

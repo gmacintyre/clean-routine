@@ -1,0 +1,33 @@
+@page
+@model WelcomeModel
+@{
+    ViewData["Title"] = "A shared cleaning routine for your home";
+    ViewData["Description"] = "Free cleaning checklist and calendar you share with the people you live with. Daily, weekly, monthly and seasonal chores, with a daily reminder on your phone.";
+}
+
+<div class="hero">
+    <span class="eyebrow">Clean Routine</span>
+    <h1>Keep the house clean together, a little each day.</h1>
+    <p>A shared cleaning checklist for everyone in your home. Each day has its own zone, bigger jobs come round once a month or once a season, and everyone can tick things off from their phone.</p>
+    @if (Model.Deleted)
+    {
+        <p class="ok-banner">Your account has been deleted.</p>
+    }
+    <div class="row wrap">
+        <a class="btn" asp-page="/Account/Register">Get started free</a>
+        <a class="link-btn" asp-page="/Account/Login">Sign in</a>
+    </div>
+</div>
+
+<ul class="features">
+    <li><strong>Today's checklist</strong>Daily basics plus the day's zone: kitchen Monday, bathrooms Tuesday, and so on. See who did what.</li>
+    <li><strong>Month at a glance</strong>A calendar of every day's zone, with the bigger monthly and seasonal jobs marked.</li>
+    <li><strong>Your routine, your way</strong>Start with a suggested routine and change anything: rename chores, move them to another day, or add one-off jobs.</li>
+    <li><strong>One reminder a day</strong>A morning notification on each phone listing that day's jobs.</li>
+    <li><strong>Share it</strong>Invite the people you live with by link. Everyone sees the same list.</li>
+    <li><strong>Free, with an ad-free option</strong>Everything is free with a few ads. Go ad-free for your whole household if you like.</li>
+</ul>
+
+<p class="note">Works in any phone browser. Add it to your home screen to use it like an app.</p>
+
+<p class="footer-links"><a asp-page="/Privacy">Privacy</a><a asp-page="/Terms">Terms</a></p>

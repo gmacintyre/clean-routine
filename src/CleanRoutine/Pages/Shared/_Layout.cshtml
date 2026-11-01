@@ -1,6 +1,10 @@
-﻿@{
+﻿@using CleanRoutine.Services
+@inject CurrentHousehold Household
+@inject Microsoft.Extensions.Options.IOptions<AdsOptions> AdsConfig
+@{
     var signedIn = User.Identity?.IsAuthenticated == true;
     var nav = ViewData["Nav"] as string;
+    var loadAdSense = AdsConfig.Value.AdSenseConfigured && await Household.ShowAdsAsync();
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -21,6 +25,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    @if (ViewData["Description"] is string description)
+    {
+        <meta name="description" content="@description" />
+    }
+    @if (loadAdSense)
+    {
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=@AdsConfig.Value.AdSenseClientId" crossorigin="anonymous"></script>
+    }
 </head>
 <body class="@(signedIn ? "has-nav" : "")">
     @Html.AntiForgeryToken()
@@ -42,7 +54,7 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>Routine
                 </a>
                 <a href="/Settings" aria-current="@(nav == "settings" ? "page" : null)">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Reminders
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>Settings
                 </a>
             </div>
         </nav>

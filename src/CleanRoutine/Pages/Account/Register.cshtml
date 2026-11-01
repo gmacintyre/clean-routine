@@ -8,35 +8,48 @@
 <div class="auth">
     <div class="dayhead">
         <span class="eyebrow">Clean Routine</span>
-        <h1>Create your account</h1>
-        <p class="note">Only the household's two email addresses can sign up.</p>
+        @if (Model.JoiningName is not null)
+        {
+            <h1>Join @Model.JoiningName</h1>
+            <p class="note">Make an account to share their cleaning checklist.</p>
+        }
+        else
+        {
+            <h1>Create your account</h1>
+            <p class="note">Free. You'll start with a suggested routine you can change any time, and can invite the people you live with.</p>
+        }
     </div>
-    @if (!Model.SignUpOpen)
-    {
-        <p class="banner">Sign-up is closed. Add your email addresses to the Household__AllowedEmails__0 and Household__AllowedEmails__1 app settings first.</p>
-    }
-    else
-    {
-        <form method="post" class="card">
-            @if (Model.Error is not null)
-            {
-                <p class="error" role="alert">@Model.Error</p>
-            }
-            <div class="field">
-                <label for="Name">First name</label>
-                <input class="txt" asp-for="Name" autocomplete="given-name" required maxlength="40" />
-            </div>
-            <div class="field">
-                <label for="Email">Email</label>
-                <input class="txt" asp-for="Email" type="email" autocomplete="username" required />
-            </div>
-            <div class="field">
-                <label for="Password">Password</label>
-                <input class="txt" asp-for="Password" type="password" autocomplete="new-password" required minlength="@AccountService.MinPasswordLength" />
-                <span class="note">At least @AccountService.MinPasswordLength characters.</span>
-            </div>
-            <button class="btn" type="submit">Create account</button>
-        </form>
-    }
-    <p class="note">Already have one? <a asp-page="Login">Sign in</a></p>
+    <form method="post" class="card">
+        @if (Model.Error is not null)
+        {
+            <p class="error" role="alert">@Model.Error</p>
+        }
+        <input type="hidden" asp-for="Invite" />
+        <input type="hidden" asp-for="TimeZone" id="tz" />
+        <div class="field">
+            <label for="Name">First name</label>
+            <input class="txt" asp-for="Name" autocomplete="given-name" required maxlength="40" />
+        </div>
+        <div class="field">
+            <label for="Email">Email</label>
+            <input class="txt" asp-for="Email" type="email" autocomplete="username" required maxlength="254" />
+        </div>
+        <div class="field">
+            <label for="Password">Password</label>
+            <input class="txt" asp-for="Password" type="password" autocomplete="new-password" required minlength="@AccountService.MinPasswordLength" />
+            <span class="note">At least @AccountService.MinPasswordLength characters.</span>
+        </div>
+        <label class="check" for="AcceptTerms">
+            <input type="checkbox" id="AcceptTerms" name="AcceptTerms" value="true" required />
+            <span class="note">I agree to the <a asp-page="/Terms" target="_blank">terms</a> and <a asp-page="/Privacy" target="_blank">privacy policy</a>.</span>
+        </label>
+        <button class="btn" type="submit">Create account</button>
+    </form>
+    <p class="note">Already have one? <a asp-page="Login" asp-route-invite="@Model.Invite">Sign in</a></p>
 </div>
+
+@section Scripts {
+    <script>
+    try { document.getElementById("tz").value = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { }
+    </script>
+}

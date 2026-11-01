@@ -1,0 +1,69 @@
+@page
+@model PremiumModel
+@{
+    ViewData["Title"] = "Ad-free";
+    ViewData["Nav"] = "settings";
+    var h = Model.Household;
+}
+
+<div class="dayhead">
+    <span class="eyebrow">Ad-free</span>
+    <h1>@(h.IsAdFree ? "You're ad-free" : "Go ad-free")</h1>
+</div>
+
+@if (Model.Error is not null)
+{
+    <p class="error" role="alert">@Model.Error</p>
+}
+
+@if (h.IsAdFree)
+{
+    <div class="card">
+        <p>Nobody in @h.Name sees ads. Thank you for supporting Clean Routine!</p>
+        @if (h.Comped)
+        {
+            <p class="note">Your household has ad-free for free.</p>
+        }
+        else if (h.SubscriptionEnding)
+        {
+            <p class="note">Your subscription is cancelled and stays active until the end of the period you've paid for.</p>
+        }
+        @if (h.StripeCustomerId is not null && Model.CanBuy && !h.Comped)
+        {
+            <form method="post" asp-page-handler="Manage">
+                <button class="btn secondary" type="submit">@(Model.IsSubscription ? "Manage billing or cancel" : "See receipts")</button>
+            </form>
+        }
+    </div>
+}
+else
+{
+    <div class="card">
+        <p class="price">@Model.PriceLabel</p>
+        <ul class="features">
+            <li><strong>No ads</strong>for everyone in your household, on every phone.</li>
+            <li><strong>Same app</strong>All the features stay free. Ad-free just takes the ads away.</li>
+            <li><strong>Supports the app</strong>Helps pay for hosting and new features.</li>
+        </ul>
+        @if (Model.CanBuy)
+        {
+            <form method="post" asp-page-handler="Buy">
+                <button class="btn" type="submit">Go ad-free</button>
+            </form>
+            <p class="note">You'll pay on a secure Stripe page. @(Model.IsSubscription ? "Cancel any time from this page." : "One payment, no subscription.")</p>
+        }
+        else
+        {
+            <p class="note">Ad-free is coming soon.</p>
+        }
+    </div>
+}
+
+<p class="footer-links"><a asp-page="/Terms">Terms</a><a asp-page="/Privacy">Privacy</a></p>
+
+@section Scripts {
+    @if (TempData["Toast"] is string toast)
+    {
+        <script>cr.toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toast)));</script>
+    }
+}

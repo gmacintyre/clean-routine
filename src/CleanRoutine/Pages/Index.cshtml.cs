@@ -5,7 +5,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CleanRoutine.Pages;
 
-public class IndexModel(DayPlanner planner, HouseholdClock clock, HouseholdStore store, TimeProvider time) : PageModel
+public class IndexModel(DayPlanner planner, HouseholdClock clock, AccountStore accounts, CurrentHousehold household,
+    TimeProvider time) : PageModel
 {
     public DayPlan Plan { get; private set; } = null!;
     public DateOnly Today { get; private set; }
@@ -14,18 +15,20 @@ public class IndexModel(DayPlanner planner, HouseholdClock clock, HouseholdStore
 
     public async Task OnGetAsync(string? date)
     {
-        Today = clock.Today;
+        var h = await household.GetAsync();
+        Today = clock.Today(h.TimeZone);
         var day = TryParse(date) ?? Today;
-        Plan = await planner.GetDayAsync(day);
-        UserOrder = await store.ReadAsync(d => d.Users.Select(u => u.Id).ToList());
+        Plan = await planner.GetDayAsync(h.Id, day);
+        UserOrder = await accounts.ReadAsync(d => d.Users.Where(u => u.HouseholdId == h.Id).Select(u => u.Id).ToList());
     }
 
     public async Task<IActionResult> OnPostToggleAsync(string taskId, string date)
     {
         if (TryParse(date) is not { } day) return BadRequest();
-        var done = await planner.ToggleAsync(taskId, day, User.UserId(), time.GetUtcNow());
+        var hid = User.HouseholdId();
+        var done = await planner.ToggleAsync(hid, taskId, day, User.UserId(), time.GetUtcNow());
         if (done is null) return NotFound();
-        var plan = await planner.GetDayAsync(day);
+        var plan = await planner.GetDayAsync(hid, day);
         return new JsonResult(new { done, doneCount = plan.DoneCount, total = plan.Tasks.Count });
     }
 

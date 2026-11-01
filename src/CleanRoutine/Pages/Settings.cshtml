@@ -1,32 +1,36 @@
 @page
 @model SettingsModel
 @{
-    ViewData["Title"] = "Reminders";
+    ViewData["Title"] = "Settings";
     ViewData["Nav"] = "settings";
 }
 
 <div class="dayhead">
-    <span class="eyebrow">Reminders</span>
-    <h1>Daily heads-up</h1>
+    <span class="eyebrow">Settings</span>
+    <h1>@Model.Household.Name</h1>
     <p class="note">One notification a day to each phone that has them turned on, listing that day's zone and jobs.</p>
 </div>
+@if (Model.Error is not null)
+{
+    <p class="error" role="alert">@Model.Error</p>
+}
 
 <section class="section">
     <h2>When</h2>
     <form method="post" asp-page-handler="Reminder" class="card">
         <div class="field">
             <label for="time">Reminder time</label>
-            <input class="txt" type="time" id="time" name="time" value="@Model.Reminders.Time.ToString("HH:mm")" required style="max-width:180px" />
+            <input class="txt" type="time" id="time" name="time" value="@Model.Household.Reminders.Time.ToString("HH:mm")" required style="max-width:180px" />
         </div>
         <label class="check" for="enabled">
-            <input type="checkbox" id="enabled" name="enabled" value="true" checked="@Model.Reminders.Enabled" />
+            <input type="checkbox" id="enabled" name="enabled" value="true" checked="@Model.Household.Reminders.Enabled" />
             Send the daily reminder
         </label>
         <div><button class="btn" type="submit">Save</button></div>
-        <p class="note">This time applies to both of you.</p>
+        <p class="note">This time applies to everyone in your household, in the @Model.Household.TimeZone time zone.</p>
         @if (Model.UsesWakeUpJob)
         {
-            <p class="note">Pick a time between 5:00 AM and 11:30 AM. The app is on Azure's free plan, so a scheduled job wakes it up during those hours to send the reminder. It can arrive up to about 20 minutes after the time you set.</p>
+            <p class="note">Reminders can arrive up to about 20 minutes after the time you set.</p>
         }
     </form>
 </section>
@@ -36,7 +40,7 @@
     <div class="card" id="push-card">
         @if (!Model.PushConfigured)
         {
-            <p class="banner">Notifications aren't set up on the server yet. Add the Push__PublicKey and Push__PrivateKey app settings (see the README).</p>
+            <p class="banner">Notifications aren't available yet.</p>
         }
         else
         {
@@ -50,20 +54,82 @@
     </div>
 </section>
 
-<section class="section">
+<section class="section" id="household">
     <h2>Household</h2>
     <div class="card">
         @foreach (var p in Model.People)
         {
             <div class="row spread">
-                <span>@p.Name</span>
+                <span>@p.Name@(p.Me ? " (you)" : "")</span>
                 <span class="count">@(p.Devices == 1 ? "1 phone" : $"{p.Devices} phones") with reminders</span>
             </div>
         }
+    </div>
+    <div class="card">
+        <span class="label">Invite someone</span>
+        <p class="note">Send this link to the people you live with. They'll make an account and share this checklist.</p>
+        <input class="txt" id="invite" type="text" readonly value="@Model.InviteUrl" aria-label="Invite link" />
+        <div class="row wrap">
+            <button class="btn" type="button" id="invite-share">Share link</button>
+            <form method="post" asp-page-handler="NewInvite">
+                <button class="link-btn" type="submit">Make a new link</button>
+            </form>
+        </div>
+    </div>
+    <form method="post" asp-page-handler="Household" class="card">
+        <div class="field">
+            <label for="name">Household name</label>
+            <input class="txt" id="name" name="name" value="@Model.Household.Name" maxlength="40" required />
+        </div>
+        <div class="field">
+            <label for="timeZone">Time zone</label>
+            <input class="txt" id="timeZone" name="timeZone" value="@Model.Household.TimeZone" list="zones" autocomplete="off" />
+            <datalist id="zones">
+                @foreach (var z in SettingsModel.TimeZones.Value)
+                {
+                    <option value="@z"></option>
+                }
+            </datalist>
+            <button class="link-btn" type="button" id="tz-here">Use this phone's time zone</button>
+        </div>
+        <div><button class="btn secondary" type="submit">Save</button></div>
+    </form>
+</section>
+
+<section class="section" id="plan">
+    <h2>Ad-free</h2>
+    <div class="card">
+        @if (Model.Household.IsAdFree)
+        {
+            <p>Your household is ad-free. Thank you!</p>
+        }
+        else
+        {
+            <p>Remove ads for everyone in your household.</p>
+        }
+        <a class="btn secondary" asp-page="/Premium">@(Model.Household.IsAdFree ? "Manage" : "Go ad-free")</a>
+    </div>
+</section>
+
+<section class="section" id="account">
+    <h2>Account</h2>
+    <div class="card">
         <form method="post" asp-page="/Account/Logout">
             <button class="link-btn" type="submit">Sign out of this phone</button>
         </form>
+        <details>
+            <summary class="link-btn danger">Delete my account</summary>
+            <form method="post" asp-page-handler="DeleteAccount" class="stack">
+                <p class="note">This deletes your account straight away. If you're the last person in your household, the household's chores and history are deleted too.</p>
+                <div class="field">
+                    <label for="confirm">Type DELETE to confirm</label>
+                    <input class="txt" id="confirm" name="confirm" autocomplete="off" required />
+                </div>
+                <div><button class="btn danger" type="submit">Delete my account</button></div>
+            </form>
+        </details>
     </div>
+    <p class="note"><a asp-page="/Privacy">Privacy</a> · <a asp-page="/Terms">Terms</a></p>
 </section>
 
 @section Scripts {
@@ -71,6 +137,23 @@
     {
         <script>cr.toast(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(toast)));</script>
     }
+    <script>
+    (() => {
+      const link = document.getElementById("invite");
+      document.getElementById("invite-share").addEventListener("click", async () => {
+        const url = link.value;
+        if (navigator.share) {
+          try { await navigator.share({ title: "Join our cleaning routine", text: "Share our cleaning checklist on Clean Routine:", url }); return; }
+          catch (e) { if (e.name === "AbortError") return; }
+        }
+        try { await navigator.clipboard.writeText(url); cr.toast("Invite link copied"); }
+        catch { link.select(); cr.toast("Copy the link above"); }
+      });
+      document.getElementById("tz-here").addEventListener("click", () => {
+        document.getElementById("timeZone").value = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      });
+    })();
+    </script>
     @if (Model.PushConfigured)
     {
         <script>

@@ -1,28 +1,28 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Options;
 
 namespace CleanRoutine.Services;
 
-/// <summary>Gives the current date and time in the household's time zone, not the server's
+/// <summary>Gives the current date and time in a household's time zone, not the server's
 /// (Azure servers run on UTC).</summary>
-public class HouseholdClock
+public class HouseholdClock(IOptions<HouseholdOptions> options, TimeProvider time, ILogger<HouseholdClock> log)
 {
-    private readonly TimeZoneInfo _zone;
-    private readonly TimeProvider _time;
+    private readonly ConcurrentDictionary<string, TimeZoneInfo> _zones = new();
 
-    public HouseholdClock(IOptions<HouseholdOptions> options, TimeProvider time, ILogger<HouseholdClock> log)
+    public DateTime Now(string? timeZone) => TimeZoneInfo.ConvertTime(time.GetUtcNow(), Zone(timeZone)).DateTime;
+    public DateOnly Today(string? timeZone) => DateOnly.FromDateTime(Now(timeZone));
+
+    public static bool IsValidZone(string? id) =>
+        !string.IsNullOrWhiteSpace(id) && TimeZoneInfo.TryFindSystemTimeZoneById(id, out _);
+
+    private TimeZoneInfo Zone(string? id)
     {
-        _time = time;
-        try
+        id = string.IsNullOrWhiteSpace(id) ? options.Value.TimeZone : id;
+        return _zones.GetOrAdd(id, z =>
         {
-            _zone = TimeZoneInfo.FindSystemTimeZoneById(options.Value.TimeZone);
-        }
-        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
-        {
-            log.LogWarning("Time zone {Zone} not found; using UTC.", options.Value.TimeZone);
-            _zone = TimeZoneInfo.Utc;
-        }
+            if (TimeZoneInfo.TryFindSystemTimeZoneById(z, out var found)) return found;
+            log.LogWarning("Time zone {Zone} not found; using UTC.", z);
+            return TimeZoneInfo.Utc;
+        });
     }
-
-    public DateTime Now => TimeZoneInfo.ConvertTime(_time.GetUtcNow(), _zone).DateTime;
-    public DateOnly Today => DateOnly.FromDateTime(Now);
 }
