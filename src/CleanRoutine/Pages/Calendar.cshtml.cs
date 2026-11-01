@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace CleanRoutine.Pages;
 
-public class CalendarModel(DayPlanner planner, HouseholdClock clock) : PageModel
+public class CalendarModel(DayPlanner planner, HouseholdClock clock, CurrentHousehold household) : PageModel
 {
     public DateOnly Month { get; private set; }
     public DateOnly Today { get; private set; }
@@ -12,7 +12,8 @@ public class CalendarModel(DayPlanner planner, HouseholdClock clock) : PageModel
 
     public async Task OnGetAsync(string? month)
     {
-        Today = clock.Today;
+        var h = await household.GetAsync();
+        Today = clock.Today(h.TimeZone);
         Month = DateOnly.TryParseExact(month, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var m)
             ? m
             : new DateOnly(Today.Year, Today.Month, 1);
@@ -21,7 +22,7 @@ public class CalendarModel(DayPlanner planner, HouseholdClock clock) : PageModel
         var start = Month.AddDays(-(int)Month.DayOfWeek);
         var last = Month.AddMonths(1).AddDays(-1);
         var end = last.AddDays(6 - (int)last.DayOfWeek);
-        Days = await planner.GetRangeAsync(start, end);
+        Days = await planner.GetRangeAsync(h.Id, start, end);
     }
 
     public static string Key(DateOnly d) => d.ToString("yyyy-MM", CultureInfo.InvariantCulture);

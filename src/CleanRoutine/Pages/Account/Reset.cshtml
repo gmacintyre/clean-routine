@@ -1,0 +1,37 @@
+@page
+@model CleanRoutine.Pages.Account.ResetModel
+@using CleanRoutine.Services
+@{
+    ViewData["Title"] = "Choose a new password";
+}
+
+<div class="auth">
+    <div class="dayhead">
+        <span class="eyebrow">Make a Home</span>
+        <h1>Choose a new password</h1>
+    </div>
+    @if (!Model.Valid)
+    {
+        <div class="card">
+            <p class="error" role="alert">That reset link has expired or was already used.</p>
+            <a class="btn secondary" asp-page="Forgot">Get a new link</a>
+        </div>
+    }
+    else
+    {
+        <form method="post" class="card">
+            @if (Model.Error is not null)
+            {
+                <p class="error" role="alert">@Model.Error</p>
+            }
+            <input type="hidden" name="u" value="@Model.UserId" />
+            <input type="hidden" name="t" value="@Model.Token" />
+            <div class="field">
+                <label for="Password">New password</label>
+                <input class="txt" asp-for="Password" type="password" autocomplete="new-password" required minlength="@AccountService.MinPasswordLength" autofocus />
+                <span class="note">At least @AccountService.MinPasswordLength characters. You'll be signed out on your other devices.</span>
+            </div>
+            <button class="btn" type="submit">Save new password</button>
+        </form>
+    }
+</div>

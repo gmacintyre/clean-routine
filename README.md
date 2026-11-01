@@ -1,14 +1,27 @@
-# Clean Routine
+# Make a Home
 
-A small private web app for our household cleaning routine:
+A shared cleaning checklist for households. Anyone can sign up for free; the free version shows ads, and a household can pay to go ad-free.
 
-- **Today**: the day's checklist. Either of us can tick things off, and each item shows who did it.
+- **Today**: the day's checklist. Anyone in the household can tick things off, and each item shows who did it.
 - **Calendar**: a month view. Every weekday has its zone (Monday is Kitchen, and so on), and monthly or seasonal jobs are marked with a dot.
 - **Routine**: every chore, grouped by how often it happens. Tap one to rename it, change how often it repeats (daily, weekly, monthly, seasonal or just once), move it to another day, or delete it. You can also add new chores and rename each day's zone here.
 - **One-off jobs**: add a job for a single date, from Routine or from any day's checklist.
-- **Reminders**: one push notification a day on each phone, listing that day's jobs.
+- **Reminders**: one push notification a day on each phone, listing that day's jobs, in the household's own time zone.
+- **Households**: signing up creates a household with a suggested starter routine. Invite the people you live with by link (Settings → Household).
+- **Ads and ad-free**: Google AdSense ads on Today, Calendar and Routine, below the content. Ad-free is bought through Stripe and covers the whole household.
 
-It's ASP.NET Core 10 Razor Pages with **no NuGet packages**. Data is one JSON file, and the app keeps a daily backup of it for 14 days. Sign-in uses a cookie with hashed passwords, and only the email addresses you list can create an account. Web push (VAPID + aes128gcm) uses .NET's built-in crypto.
+It's ASP.NET Core 10 Razor Pages with **no NuGet packages**. Stripe and web push are called over plain HTTPS with .NET's built-in crypto. Sign-in uses a cookie with hashed passwords.
+
+## Why a web app, not a native app
+
+Make a Home stays an installable web app (PWA) for launch:
+
+- **It already works like an app.** People add it to their home screen, and it gets notifications on Android and on iPhone (iOS 16.4+, from the home screen).
+- **Payments cost less.** Stripe takes about 2.9% + 30¢. In-app purchases in the App Store or Google Play take 15% (small business rate) and the stores require them for digital upgrades like ad-free.
+- **Ads work without a store.** AdSense runs on websites. AdMob, the mobile ad network, only works inside a native app.
+- **One codebase, no review queues, no $99/year Apple fee.**
+
+If you later want store listings, wrap the same site: a Trusted Web Activity for Google Play (keeps web ads and payments, with some Play billing rules) or Capacitor for the App Store (needs in-app purchase and AdMob instead of Stripe and AdSense). That's worth doing once the web version has users.
 
 ## Run it locally
 
@@ -19,15 +32,25 @@ cd src/CleanRoutine
 dotnet run
 ```
 
-Open http://localhost:5103 and create an account with `you@example.com` (the development settings allow `you@example.com` and `partner@example.com`). Local data goes in `src/CleanRoutine/App_Data/`, which git ignores.
+Open http://localhost:5103, choose **Get started free** and create an account. Local data goes in `src/CleanRoutine/App_Data/`, which git ignores. Without AdSense settings, the ad spots show a small "go ad-free" card instead.
 
 To try notifications locally, generate keys (see step 3 below) and put them in `appsettings.Development.json` under `Push`. Browsers allow push on `localhost` without HTTPS.
 
-## Deploy to Azure App Service (Free plan)
+To try password reset locally without email, choose **Forgot your password?**: in Development the reset link is written to the console instead of being emailed.
 
-The app runs on Azure's **Free (F1)** plan, which costs nothing. It gets its own plan, separate from the tea recipe app's B1 plan.
+To try payments locally, use Stripe test keys and the Stripe CLI: `stripe listen --forward-to localhost:5103/api/stripe/webhook` prints a `whsec_…` secret to use as `Billing__StripeWebhookSecret`. Pay with card `4242 4242 4242 4242`.
 
-The Free plan puts the app to sleep after about 20 minutes with no visits, so the first visit after that takes 10–30 seconds to load. A sleeping app also can't send the morning reminder. A scheduled GitHub Actions job solves this (step 7): it wakes the app every 15 minutes through the morning, and the app sends the reminder once its time has passed.
+## Launch checklist (things only the owner can do)
+
+1. **Make this repo private** (GitHub → Settings → General → Danger Zone → Change visibility) before adding any secrets. Secrets go in Azure app settings, never in the repo.
+2. **Move the app to the Basic B1 plan and turn on Always On** (about $13/month). The Free plan sleeps, so reminders in other time zones can't go out, has a 60 CPU-minutes/day cap, and can't use a custom domain, which AdSense needs.
+3. **Add the domain `makeahome.app`** to the web app (Custom domains → Add custom domain) with a free App Service managed certificate.
+4. **Google AdSense:** apply with the domain, set up the consent message for EU/UK visitors (AdSense → Privacy & messaging), create three display ad units, and add the ids as app settings (below). The welcome page, privacy policy and terms are public so the review has content to look at.
+5. **Stripe:** create an account, a product "Make a Home ad-free" with a price, a webhook, and turn on the customer portal (below).
+6. **Privacy policy and terms:** the app has drafts at `/Privacy` and `/Terms`. Fill in `Site__OperatorName` and `Site__ContactEmail`, and have them reviewed.
+7. **Email for password resets:** set up an email service with SMTP (Azure Communication Services Email is the easy choice on Azure; Brevo, Postmark or Mailgun also work), send from your own domain, and add the `Email__…` settings (below). Until then, "Forgot your password?" asks people to email `Site__ContactEmail`.
+
+## Deploy to Azure App Service
 
 ### 1. Create the web app
 
@@ -36,15 +59,14 @@ In the Azure portal: **Create a resource → Web App**
 - **Publish:** Code
 - **Runtime stack:** .NET 10 (LTS)
 - **Operating system:** Linux
-- **Pricing plan:** click **Create new**, then under **Explore pricing plans** choose **Free F1**
+- **Pricing plan:** **Basic B1** (Free F1 works for testing only; see the launch checklist)
 
 ### 2. Turn on these settings
 
-In the new web app, open **Settings → Configuration → General settings**:
+In the web app, open **Settings → Configuration → General settings**:
 
 - **HTTPS Only: On**
-
-Always On isn't available on the Free plan. The wake-up job in step 7 takes its place.
+- **Always On: On** (B1 and up)
 
 ### 3. Generate notification keys
 
@@ -59,21 +81,86 @@ It prints a public and a private key. Keep the private key secret and don't comm
 
 ### 4. Add app settings
 
-In **Settings → Environment variables → App settings**, add:
+In **Settings → Environment variables → App settings**, add these. Each name uses **two underscores** between parts. Click **Apply** to save.
 
 | Name | Value |
 |---|---|
-| `Household__AllowedEmails__0` | your email |
-| `Household__AllowedEmails__1` | your husband's email |
-| `Household__TimeZone` | `America/New_York` |
-| `Push__PublicKey` | public key from step 3 |
-| `Push__PrivateKey` | private key from step 3 |
+| `Household__TimeZone` | Default time zone for new households if the browser doesn't send one, e.g. `America/New_York` |
+| `Push__PublicKey` / `Push__PrivateKey` | from step 3 |
 | `Push__Subject` | `mailto:` followed by your email |
-| `Reminders__TriggerKey` | a long random password you make up; it's also used in step 7 |
+| `Site__OperatorName` | your name or business name, shown on the privacy policy and terms |
+| `Site__ContactEmail` | where people write for help |
+| `Site__BaseUrl` | the app's public address, e.g. `https://makeahome.app`, used in reset-email links |
+| `Email__SmtpHost` / `Email__SmtpPort` | SMTP server and port (587, STARTTLS), e.g. `smtp.azurecomm.net` |
+| `Email__SmtpUser` / `Email__SmtpPassword` | SMTP sign-in from your email service |
+| `Email__From` | sender address the service allows, e.g. `DoNotReply@makeahome.app` |
+| `Ads__AdSenseClientId` | `ca-pub-…` from AdSense |
+| `Ads__Slots__today` / `Ads__Slots__calendar` / `Ads__Slots__routine` | the ad unit ids (the `data-ad-slot` numbers) |
+| `Billing__StripeSecretKey` | `sk_live_…` (or `sk_test_…` while testing) |
+| `Billing__StripePriceId` | `price_…` of the ad-free price |
+| `Billing__StripeWebhookSecret` | `whsec_…` from the webhook (step 5) |
+| `Billing__Mode` | `subscription` for a monthly/yearly price, `payment` for a one-time price |
+| `Billing__PriceLabel` | the price as shown in the app, e.g. `$1.99 a month` |
+| `Reminders__TriggerKey` | only if you stay on the Free plan and use the wake-up job (step 9) |
 
-Data is saved to `%HOME%/data/clean-routine/household.json`. That's App Service's persistent storage, so it survives restarts and redeploys.
+`/ads.txt` is served automatically from `Ads__AdSenseClientId`. Without Stripe settings the Ad-free page says "coming soon"; without AdSense settings the ad spots show the "go ad-free" card (set `Ads__HouseAds` to `false` to hide it).
 
-### 5. Automatic deploys from GitHub
+Data is saved under `%HOME%/data/clean-routine/`, App Service's persistent storage, so it survives restarts and redeploys.
+
+### 5. Set up Stripe
+
+1. **Products → Add product:** "Make a Home ad-free", with a recurring price (suggested $1.99/month or $14.99/year) or a one-time price. Copy the price id into `Billing__StripePriceId`.
+2. **Developers → Webhooks → Add endpoint:** `https://makeahome.app/api/stripe/webhook`, with these events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`. Copy its signing secret into `Billing__StripeWebhookSecret`.
+3. **Settings → Billing → Customer portal:** turn it on and allow cancelling. The app's "Manage billing or cancel" button opens it.
+
+### 6. Set up email (for password resets)
+
+The app sends email through SMTP, the standard way programs hand mail to an email service. These steps use Azure Communication Services, which costs a fraction of a cent per email. It takes about 30 minutes, plus waiting for DNS.
+
+**a. Create the email service and a sending domain**
+
+1. In the Azure portal: **Create a resource → Email Communication Services**. Put it in the same resource group as the web app. Data location: United States.
+2. Open it, then **Provision domains → Add domain → Custom domain**, and enter `makeahome.app`.
+3. Azure shows DNS records to add at your domain registrar: a **TXT** record to prove you own it, then **SPF** (TXT) and two **DKIM** (CNAME) records so mail isn't marked as spam. Add each one, then click **Verify** next to it. All four need to say Verified. DNS can take from a few minutes to a few hours.
+   - Just testing before you have a domain? Choose **Add an Azure managed domain** instead. It's instant, but it sends from a `…azurecomm.net` address, has low sending limits and more often lands in spam.
+4. Open the domain → **MailFrom addresses**. `DoNotReply@makeahome.app` is there by default. Change the display name to "Make a Home".
+
+**b. Create the Communication Services resource and connect the domain**
+
+1. **Create a resource → Communication Services**, same resource group, data location United States.
+2. Open it → **Email → Domains → Connect domain**, and pick the domain from step a.
+
+**c. Give the app a login for SMTP**
+
+This uses an app registration, like the deploy login.
+
+1. **Microsoft Entra ID → App registrations → New registration**. Name it `MakeAHome-Email` and keep the defaults.
+2. In it, open **Certificates & secrets → Client secrets → New client secret**, set it to expire in 24 months, and **copy the Value straight away** (it's shown only once). This is the SMTP password. Put a reminder in your calendar to make a new one before it expires.
+3. Open the **Communication Services** resource → **Access control (IAM) → Add → Add role assignment**. Choose the role **Communication and Email Service Owner**, then **User, group, or service principal → Select members**, and pick `MakeAHome-Email`. Then **Review + assign**.
+4. Still in the Communication Services resource, open **SMTP Usernames → Add SMTP Username**. Pick `MakeAHome-Email` and enter `DoNotReply@makeahome.app` as the username. Wait until it says **Ready to use**. If the app isn't in the list, the role from step 3 hasn't applied yet; wait a few minutes.
+
+**d. Add the app settings** (web app → Environment variables → App settings, then Apply)
+
+| Name | Value |
+|---|---|
+| `Email__SmtpHost` | `smtp.azurecomm.net` |
+| `Email__SmtpPort` | `587` |
+| `Email__SmtpUser` | the SMTP username from c4 |
+| `Email__SmtpPassword` | the client secret from c2 |
+| `Email__From` | `DoNotReply@makeahome.app` |
+| `Site__BaseUrl` | `https://makeahome.app` |
+
+**e. Test it.** Sign out, choose **Forgot your password?**, and enter your own email. If nothing arrives within a few minutes, check spam, then **Log stream** in the web app for a line starting "Couldn't send the password reset email":
+
+| Error mentions | Fix |
+|---|---|
+| `5.7.57` or authentication failed | Wrong SMTP username or password, or the client secret expired |
+| `5.3.5` sender's username is invalid | `Email__From` isn't a MailFrom address of a connected domain |
+| `5.7.1` not allowed / domain not linked | The domain isn't connected (step b2) or isn't verified |
+
+Prefer something simpler? Any SMTP email service works with the same settings. Brevo, for example, has a free tier: you verify your domain in its dashboard and it gives you an SMTP host, login and key to put in the `Email__…` settings.
+
+### 7. Automatic deploys from GitHub
 
 Deploys use the workflow Visual Studio created (`.github/workflows/CleanRoutine20261029180254.yml`) and run on every push to `main`. GitHub signs in to Azure through a Microsoft Entra **app registration** with no stored password, the same way the tea recipe app does. These pieces have to be in place:
 
@@ -95,59 +182,53 @@ If the deploy fails at **Azure Login**, the step before it lists which variables
 | AADSTS700213 "No matching federated identity record" | The subject in step 2 doesn't match. Copy it from the error message. |
 | "No subscriptions found" | Step 3: the role is missing or hasn't applied yet (wait about 5 minutes) |
 
-### 6. Set up each phone
+### 8. Set up each phone
 
-1. Open the site and create your account. Each listed email can sign up once.
+1. Open the site and create an account, or follow an invite link.
 2. **iPhone:** in Safari, tap **Share → Add to Home Screen**, then open the app from the Home Screen. iOS only allows notifications for Home Screen apps (iOS 16.4 or later).
    **Android:** in Chrome, tap the menu and choose **Add to Home screen** or **Install app**.
-3. Go to **Reminders → Turn on notifications**, allow them, and tap **Send a test**.
+3. Go to **Settings → Turn on notifications**, allow them, and tap **Send a test**.
 
-The reminder time is shared by both of you and defaults to 7:30 AM.
+### 9. Free plan only: the morning wake-up job
 
-### 7. Turn on the morning wake-up job
+On B1 with Always On, skip this and you can delete `.github/workflows/reminder.yml`.
 
-The **Daily reminder wake-up** workflow (`.github/workflows/reminder.yml`) calls the app every 15 minutes from 5 AM to about noon Eastern. Each call wakes the app and sends the day's reminder once the reminder time has passed. Later calls that day do nothing.
-
-In this GitHub repo, go to **Settings → Secrets and variables → Actions**:
-
-- Under **Secrets**, add `REMINDER_TRIGGER_KEY` with the same value as the `Reminders__TriggerKey` app setting.
-- Under **Variables**, add `CLEAN_ROUTINE_URL` with the app's address, like `https://your-app-name.azurewebsites.net`.
-
-To check it, open the **Actions** tab, choose **Daily reminder wake-up → Run workflow**, and open the run. Its log ends with a status:
-
-| Status | Meaning |
-|---|---|
-| `sent` | The reminder went out |
-| `already-sent` | It already went out today |
-| `not-yet` | The reminder time hasn't come yet |
-| `no-devices` | No phone has notifications turned on |
-| `disabled` | Reminders are switched off in the app |
-| `push-not-configured` | The `Push__` keys are missing |
-
-A 401 error means the key in GitHub doesn't match the app setting.
-
-Things to know:
-
-- **Pick a reminder time between 5:00 AM and 11:30 AM.** The job only runs in the morning. A reminder can arrive up to about 20 minutes after the time you set, because the job runs every 15 minutes and GitHub sometimes starts scheduled jobs a few minutes late.
-- **In a public repo, GitHub turns off scheduled jobs after 60 days with no commits.** It emails you first, and you can turn the job back on from the Actions tab. A private repo doesn't have this limit, but each run counts against the free 2,000 Actions minutes a month. This job uses about 960 a month.
-- **The wake-up calls also keep the app awake in the morning,** so it loads quickly then.
-
-To move to a paid plan later, scale the plan up to B1 and turn on **Always On**. The app's own timer then sends the reminder at any time of day, and you can delete the wake-up job.
+On the Free plan the app sleeps, so the **Daily reminder wake-up** workflow calls `POST /api/reminders/run` every 15 minutes from about 5 AM to noon Eastern. Each call wakes the app and sends any reminders that are due. In GitHub **Settings → Secrets and variables → Actions**, add the secret `REMINDER_TRIGGER_KEY` (same value as `Reminders__TriggerKey`) and the variable `CLEAN_ROUTINE_URL`. The run log ends with `nothing-due`, `sent-N-of-M` (households reached of those due) or `push-not-configured`. This only suits households in US time zones with morning reminder times.
 
 ## Where things live
 
 | Path | What it does |
 |---|---|
 | `Domain/Schedule.cs` | Which tasks are due on a date (daily, weekly, nth weekday of the month, seasonal in Jan/Apr/Jul/Oct, one-off) |
+| `Domain/SeedRoutine.cs` | The starter routine every new household gets |
 | `Pages/Chore.cshtml` | Add or edit a chore |
-| `Domain/SeedRoutine.cs` | The starting routine, loaded on first run |
-| `Services/HouseholdStore.cs` | JSON file storage with a lock, atomic saves and daily backups |
-| `Services/AccountService.cs` | Sign-up allowlist and password checks |
+| `Services/AccountStore.cs` | Accounts and households (`accounts.json`) |
+| `Services/HouseholdStore.cs` | Each household's chores and ticks (`households/{id}.json`) |
+| `Services/Storage.cs` | Shared JSON file handling: locking, atomic saves, daily backups |
+| `Services/DataMigration.cs` | One-time move from the original single `household.json` |
+| `Services/AccountService.cs` | Sign-up, invites, password reset, joining and deleting accounts |
+| `Services/EmailSender.cs` | Sends email over SMTP |
+| `Pages/Account/Forgot.cshtml`, `Reset.cshtml` | Forgot password: one-time links that expire after an hour and sign out other devices |
+| `Billing/StripeBilling.cs` | Stripe Checkout, customer portal and webhook |
+| `Pages/Shared/_Ad.cshtml` | The ad spot (AdSense unit or "go ad-free" card) |
+| `Pages/Premium.cshtml` | The ad-free page |
+| `Pages/Welcome.cshtml`, `Privacy.cshtml`, `Terms.cshtml` | Public pages |
 | `Push/WebPushCrypto.cs` | VAPID signing and payload encryption |
-| `Push/DailyReminderService.cs` | Sends the daily reminder (from the app's timer or the wake-up link) |
-| `.github/workflows/reminder.yml` | Morning wake-up job for the Free plan |
+| `Push/DailyReminderService.cs` | Sends each household's daily reminder |
 | `wwwroot/sw.js`, `manifest.webmanifest` | Home-screen app and notification display |
 
-## Backups
+## Data and backups
 
-The app copies `household.json` to `backups/household-YYYY-MM-DD.json` once a day and keeps 14 days of copies. To restore one, stop the app, copy a backup over `household.json` (through Kudu or the SSH console), and start the app again.
+```
+data/clean-routine/
+  accounts.json              every account and household (plan, time zone, reminder time, invite code)
+  households/{id}.json       one household's chores, zones, ticks and phones
+  backups/YYYY-MM-DD/        copies of each file from before its first change that day (14 days kept)
+  household.json.migrated    the original single-household file, kept after the one-time move
+```
+
+The first time this version starts, it moves the original `household.json` into this layout. Both original accounts keep their passwords, chores and history, end up in one household called "Our home" (rename it in Settings), and that household is ad-free for good.
+
+To restore a backup, stop the app, copy the file from `backups/` over the live one (through Kudu or the SSH console), and start the app again.
+
+This layout comfortably handles thousands of households on one server. If the app grows past that, or needs more than one server, move `AccountStore` and `HouseholdStore` to Azure SQL or Cosmos DB; nothing else reads the files directly.

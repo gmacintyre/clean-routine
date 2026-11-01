@@ -1,154 +1,112 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Collections.Concurrent;
 using CleanRoutine.Domain;
-using Microsoft.Extensions.Options;
 
 namespace CleanRoutine.Services;
 
 /// <summary>
-/// Keeps all household data in one JSON file. Every read and write goes through a lock, so the
-/// two of you checking things off at the same moment can't overwrite each other. Writes go to a
-/// temp file first and are then swapped in, and a dated backup is kept for the last 14 days.
+/// Each household's chores, ticks and phones, one JSON file per household in households/{id}.json.
+/// Files are loaded on first use and dropped from memory after 30 minutes without use, so memory
+/// stays flat as more households sign up. A new household gets the starter routine the first time
+/// its file is opened.
 /// </summary>
-public sealed class HouseholdStore
+public sealed class HouseholdStore(DataPaths paths, ILogger<HouseholdStore> log)
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
-    {
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() },
-    };
-
-    private const int BackupsToKeep = 14;
     private static readonly TimeSpan KeepCompletionsFor = TimeSpan.FromDays(3 * 365);
+    private static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(30);
 
-    private readonly SemaphoreSlim _lock = new(1, 1);
-    private readonly ILogger<HouseholdStore> _log;
-    private HouseholdData? _data;
-
-    public string FilePath { get; }
-    private string BackupDirectory { get; }
-
-    public HouseholdStore(IOptions<StorageOptions> options, IHostEnvironment env, ILogger<HouseholdStore> log)
-    {
-        _log = log;
-        var dir = ResolveDirectory(options.Value.DataDirectory, env);
-        Directory.CreateDirectory(dir);
-        FilePath = Path.Combine(dir, "household.json");
-        BackupDirectory = Path.Combine(dir, "backups");
-        _log.LogInformation("Household data file: {Path}", FilePath);
-    }
-
-    private static string ResolveDirectory(string? configured, IHostEnvironment env)
-    {
-        if (!string.IsNullOrWhiteSpace(configured)) return configured;
-
-        // On Azure App Service, %HOME% is persistent storage shared across restarts and deploys.
-        var home = Environment.GetEnvironmentVariable("HOME");
-        if (Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME") is not null && !string.IsNullOrEmpty(home))
-            return Path.Combine(home, "data", "clean-routine");
-
-        return Path.Combine(env.ContentRootPath, "App_Data");
-    }
+    private readonly ConcurrentDictionary<string, JsonFile<HouseholdData>> _open = new();
+    private DateTime _lastSweep = DateTime.UtcNow;
 
     /// <summary>Read data. Copy what you need out of <paramref name="read"/>; don't keep references.</summary>
-    public async Task<T> ReadAsync<T>(Func<HouseholdData, T> read)
-    {
-        await _lock.WaitAsync();
-        try
-        {
-            return read(await LoadAsync());
-        }
-        finally
-        {
-            _lock.Release();
-        }
-    }
+    public Task<T> ReadAsync<T>(string householdId, Func<HouseholdData, T> read) =>
+        RunAsync(householdId, read, save: false);
 
-    public async Task<T> WriteAsync<T>(Func<HouseholdData, T> change)
-    {
-        await _lock.WaitAsync();
-        try
-        {
-            var data = await LoadAsync();
-            var result = change(data);
-            await SaveAsync(data);
-            return result;
-        }
-        finally
-        {
-            _lock.Release();
-        }
-    }
+    public Task<T> WriteAsync<T>(string householdId, Func<HouseholdData, T> change) =>
+        RunAsync(householdId, change, save: true);
 
-    public Task WriteAsync(Action<HouseholdData> change) =>
-        WriteAsync(d =>
+    public Task WriteAsync(string householdId, Action<HouseholdData> change) =>
+        WriteAsync(householdId, d =>
         {
             change(d);
             return true;
         });
 
-    private async Task<HouseholdData> LoadAsync()
+    /// <summary>Delete a household's file, for when its last member deletes their account.</summary>
+    public async Task DeleteAsync(string householdId)
     {
-        if (_data is not null) return _data;
-
-        if (File.Exists(FilePath))
-        {
-            await using var stream = File.OpenRead(FilePath);
-            _data = await JsonSerializer.DeserializeAsync<HouseholdData>(stream, Json)
-                    ?? throw new InvalidDataException($"{FilePath} is empty or not valid.");
-        }
-        else
-        {
-            _data = new HouseholdData();
-        }
-
-        if (_data.Zones.Length != 7)
-        {
-            var zones = _data.Zones;
-            Array.Resize(ref zones, 7);
-            _data.Zones = zones;
-        }
-
-        if (!_data.Seeded)
-        {
-            SeedRoutine.Apply(_data);
-            await SaveAsync(_data);
-        }
-
-        return _data;
-    }
-
-    private async Task SaveAsync(HouseholdData data)
-    {
-        var cutoff = DateOnly.FromDateTime(DateTime.UtcNow - KeepCompletionsFor);
-        data.Completions.RemoveAll(c => c.Date < cutoff);
-
-        BackupOncePerDay();
-
-        var temp = FilePath + ".tmp";
-        await using (var stream = File.Create(temp))
-        {
-            await JsonSerializer.SerializeAsync(stream, data, Json);
-        }
-        File.Move(temp, FilePath, overwrite: true);
-    }
-
-    private void BackupOncePerDay()
-    {
+        var path = paths.HouseholdFile(householdId);
+        var file = Open(householdId);
+        await file.Lock.WaitAsync();
         try
         {
-            if (!File.Exists(FilePath)) return;
-            Directory.CreateDirectory(BackupDirectory);
-            var target = Path.Combine(BackupDirectory, $"household-{DateTime.UtcNow:yyyy-MM-dd}.json");
-            if (File.Exists(target)) return;
-            File.Copy(FilePath, target);
-            foreach (var old in Directory.GetFiles(BackupDirectory, "household-*.json")
-                         .OrderDescending().Skip(BackupsToKeep))
-                File.Delete(old);
+            file.Closed = true;
+            _open.TryRemove(new KeyValuePair<string, JsonFile<HouseholdData>>(householdId, file));
+            File.Delete(path);
         }
-        catch (Exception ex)
+        finally { file.Lock.Release(); }
+    }
+
+    private async Task<T> RunAsync<T>(string householdId, Func<HouseholdData, T> action, bool save)
+    {
+        SweepIdle();
+        while (true)
         {
-            _log.LogWarning(ex, "Could not write the daily backup.");
+            var file = Open(householdId);
+            await file.Lock.WaitAsync();
+            try
+            {
+                // Dropped from memory while we waited: open it again so we don't write a stale copy.
+                if (file.Closed) continue;
+                var data = await file.LoadAsync();
+                var result = action(data);
+                if (save)
+                {
+                    var cutoff = DateOnly.FromDateTime(DateTime.UtcNow - KeepCompletionsFor);
+                    data.Completions.RemoveAll(c => c.Date < cutoff);
+                    await file.SaveAsync(data);
+                }
+                return result;
+            }
+            finally { file.Lock.Release(); }
+        }
+    }
+
+    private JsonFile<HouseholdData> Open(string householdId) =>
+        _open.GetOrAdd(householdId, id => new JsonFile<HouseholdData>(
+            paths.HouseholdFile(id), paths.BackupsDirectory, log, Normalize));
+
+    private static bool Normalize(HouseholdData data)
+    {
+        var changed = false;
+        if (data.Zones.Length != 7)
+        {
+            var zones = data.Zones;
+            Array.Resize(ref zones, 7);
+            data.Zones = zones;
+            changed = true;
+        }
+        if (!data.Seeded)
+        {
+            SeedRoutine.Apply(data);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private void SweepIdle()
+    {
+        var now = DateTime.UtcNow;
+        if (now - _lastSweep < TimeSpan.FromMinutes(5)) return;
+        _lastSweep = now;
+        foreach (var (id, file) in _open)
+        {
+            if (now - file.LastUsedUtc < IdleTimeout || !file.Lock.Wait(0)) continue;
+            try
+            {
+                file.Closed = true;
+                _open.TryRemove(new KeyValuePair<string, JsonFile<HouseholdData>>(id, file));
+            }
+            finally { file.Lock.Release(); }
         }
     }
 }

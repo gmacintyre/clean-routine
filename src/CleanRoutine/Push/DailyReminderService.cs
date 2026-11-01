@@ -5,11 +5,13 @@ using CleanRoutine.Services;
 namespace CleanRoutine.Push;
 
 /// <summary>
-/// Sends the day's reminder once the household's reminder time has passed, at most once a day.
-/// While the app is awake it checks every minute. On the Free plan the app sleeps when idle, so a
-/// scheduled GitHub Actions job also calls POST /api/reminders/run to wake it (see Program.cs).
+/// Sends each household its day's reminder once that household's reminder time has passed (in its own
+/// time zone), at most once a day. While the app is awake it checks every minute. On a plan without
+/// Always On the app sleeps when idle, so a scheduled GitHub Actions job also calls POST /api/reminders/run
+/// to wake it (see Program.cs).
 /// </summary>
 public class DailyReminderService(
+    AccountStore accounts,
     HouseholdStore store,
     HouseholdClock clock,
     DayPlanner planner,
@@ -41,36 +43,53 @@ public class DailyReminderService(
         } while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    /// <summary>Send today's reminder if it's due and hasn't gone out yet. Safe to call any number of times.</summary>
-    /// <returns>What happened, as a short status word.</returns>
+    /// <summary>Send every reminder that's due and hasn't gone out yet. Safe to call any number of times.</summary>
+    /// <returns>What happened, as a short status.</returns>
     public async Task<string> RunIfDueAsync(CancellationToken ct = default)
     {
         if (!sender.IsConfigured) return "push-not-configured";
 
-        var now = clock.Now;
-        var today = DateOnly.FromDateTime(now);
-        var time = TimeOnly.FromDateTime(now);
-
-        // Claim today's reminder before sending, so two callers at once (the timer and the
-        // wake-up job) can't both send it. The store's lock makes this check-and-set atomic.
-        var status = await store.WriteAsync(d =>
+        // Claim each due reminder before sending, so two callers at once (the timer and the wake-up job)
+        // can't both send it. The store's lock makes this check-and-set atomic.
+        // Look first without writing, so a minute with nothing due doesn't rewrite the accounts file.
+        if (!await accounts.ReadAsync(a => a.Households.Any(h => IsDue(h, out _)))) return "nothing-due";
+        var due = await accounts.WriteAsync(a =>
         {
-            var r = d.Reminders;
-            if (!r.Enabled) return "disabled";
-            if (r.LastSentDate == today) return "already-sent";
-            if (time < r.Time) return "not-yet";
-            if (now.Hour > LatestCatchUpHour) return "too-late";
-            if (d.PushSubscriptions.Count == 0) return "no-devices";
-            r.LastSentDate = today;
-            return "send";
+            var list = new List<(string Id, DateOnly Today)>();
+            foreach (var h in a.Households)
+            {
+                if (!IsDue(h, out var today)) continue;
+                h.Reminders.LastSentDate = today;
+                list.Add((h.Id, today));
+            }
+            return list;
         });
-        if (status != "send") return status;
 
-        var plan = await planner.GetDayAsync(today);
-        var result = await sender.SendAsync(Compose(plan), ct: ct);
-        log.LogInformation("Daily reminder for {Date}: {Sent} sent, {Removed} removed, {Failed} failed.",
-            today, result.Sent, result.Removed, result.Failed);
-        return "sent";
+        var sent = 0;
+        foreach (var (id, today) in due)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                if (!await store.ReadAsync(id, d => d.PushSubscriptions.Count > 0)) continue;
+                var result = await sender.SendAsync(id, Compose(await planner.GetDayAsync(id, today)), ct: ct);
+                if (result.Sent > 0) sent++;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                log.LogWarning(ex, "Reminder for household {Id} failed.", id);
+            }
+        }
+        if (due.Count > 0) log.LogInformation("Daily reminders: {Due} due, {Sent} households reached.", due.Count, sent);
+        return due.Count == 0 ? "nothing-due" : $"sent-{sent}-of-{due.Count}";
+    }
+
+    private bool IsDue(HouseholdInfo h, out DateOnly today)
+    {
+        var now = clock.Now(h.TimeZone);
+        today = DateOnly.FromDateTime(now);
+        var r = h.Reminders;
+        return r.Enabled && r.LastSentDate != today && TimeOnly.FromDateTime(now) >= r.Time && now.Hour <= LatestCatchUpHour;
     }
 
     public static PushMessage Compose(DayPlan plan)

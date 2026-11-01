@@ -1,6 +1,6 @@
 name: Daily reminder wake-up
 
-# The cleaning app runs on Azure's Free plan, which sleeps when nobody is using it, so its own
+# Only needed on Azure's Free plan (no Always On). The app sleeps when nobody is using it, so its own
 # timer can't send the morning reminder. This job calls the app every 15 minutes through the
 # morning. Each call wakes the app; the app sends the reminder only once its reminder time has
 # passed, and only once a day. Calls before then do nothing.

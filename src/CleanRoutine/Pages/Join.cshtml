@@ -1,0 +1,28 @@
+@page "/Join/{code}"
+@model JoinModel
+@{
+    ViewData["Title"] = "Join a household";
+}
+
+<div class="auth">
+    <div class="dayhead">
+        <span class="eyebrow">Invite</span>
+        <h1>@(Model.HouseholdName is null ? "Invite link" : $"Join {Model.HouseholdName}?")</h1>
+    </div>
+    @if (Model.Error is not null)
+    {
+        <p class="error" role="alert">@Model.Error</p>
+        <a class="link-btn" href="/">Back to your checklist</a>
+    }
+    else
+    {
+        <form method="post" class="card">
+            <p>You'll share @Model.HouseholdName's checklist and reminders instead of @Model.CurrentName's.</p>
+            <p class="note">If you're the only person in @Model.CurrentName, its chores and history will be deleted.</p>
+            <div class="row wrap">
+                <button class="btn" type="submit">Join</button>
+                <a class="link-btn" href="/">Not now</a>
+            </div>
+        </form>
+    }
+</div>

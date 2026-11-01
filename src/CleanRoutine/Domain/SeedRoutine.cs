@@ -1,6 +1,7 @@
 namespace CleanRoutine.Domain;
 
-/// <summary>The starting routine, loaded the first time the app runs. Edit it in the app afterwards.</summary>
+/// <summary>The suggested starting routine every new household gets. They edit it in the app afterwards.
+/// (The original household keeps its own routine, including the baby-gear day.)</summary>
 public static class SeedRoutine
 {
     public static void Apply(HouseholdData data)
@@ -12,13 +13,12 @@ public static class SeedRoutine
         data.Zones[(int)DayOfWeek.Wednesday] = "Dusting";
         data.Zones[(int)DayOfWeek.Thursday] = "Floors";
         data.Zones[(int)DayOfWeek.Friday] = "Bedding & towels";
-        data.Zones[(int)DayOfWeek.Saturday] = "Baby gear";
+        data.Zones[(int)DayOfWeek.Saturday] = "Living areas";
 
         data.Tasks =
         [
             Daily("Make beds"),
             Daily("Do dishes or run the dishwasher"),
-            Daily("Wash bottles and pump parts"),
             Daily("Wipe kitchen counters and stovetop"),
             Daily("Quick wipe of bathroom sink and counter"),
             Daily("10-minute tidy"),
@@ -39,12 +39,12 @@ public static class SeedRoutine
             Weekly(DayOfWeek.Thursday, "Mop hard floors"),
             Weekly(DayOfWeek.Friday, "Change sheets"),
             Weekly(DayOfWeek.Friday, "Wash towels"),
-            Weekly(DayOfWeek.Saturday, "Wipe high-touch spots"),
-            Weekly(DayOfWeek.Saturday, "Clean the changing pad"),
-            Weekly(DayOfWeek.Saturday, "Wash toys"),
-            Weekly(DayOfWeek.Saturday, "Wipe stroller handles"),
+            Weekly(DayOfWeek.Saturday, "Wipe door handles, light switches and remotes"),
+            Weekly(DayOfWeek.Saturday, "Tidy and wipe the entryway"),
+            Weekly(DayOfWeek.Saturday, "Shake out rugs and fluff cushions"),
+            Weekly(DayOfWeek.Saturday, "Water plants"),
             Weekly(DayOfWeek.Sunday, "Plan meals for the week"),
-            Weekly(DayOfWeek.Sunday, "Restock cleaning and baby supplies"),
+            Weekly(DayOfWeek.Sunday, "Restock cleaning supplies"),
 
             Monthly(1, "Wipe baseboards, door handles and light switches"),
             Monthly(2, "Clean inside the oven and descale the kettle or coffee maker"),
@@ -56,7 +56,7 @@ public static class SeedRoutine
             Seasonal(2, "Deep clean the fridge and freezer"),
             Seasonal(2, "Flip or rotate mattresses"),
             Seasonal(3, "Replace HVAC filters and test smoke detectors"),
-            Seasonal(4, "Declutter closets and outgrown baby clothes"),
+            Seasonal(4, "Declutter closets and donate what you don't use"),
         ];
         data.Seeded = true;
     }
