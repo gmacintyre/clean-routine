@@ -101,7 +101,7 @@ In **Settings → Environment variables → App settings**, add these. Each name
 | `Billing__StripeWebhookSecret` | `whsec_…` from the webhook (step 5) |
 | `Billing__Mode` | `subscription` for a monthly/yearly price, `payment` for a one-time price |
 | `Billing__PriceLabel` | the price as shown in the app, e.g. `$1.99 a month` |
-| `Reminders__TriggerKey` | only if you stay on the Free plan and use the wake-up job (step 8) |
+| `Reminders__TriggerKey` | only if you stay on the Free plan and use the wake-up job (step 9) |
 
 `/ads.txt` is served automatically from `Ads__AdSenseClientId`. Without Stripe settings the Ad-free page says "coming soon"; without AdSense settings the ad spots show the "go ad-free" card (set `Ads__HouseAds` to `false` to hide it).
 
@@ -113,7 +113,54 @@ Data is saved under `%HOME%/data/clean-routine/`, App Service's persistent stora
 2. **Developers → Webhooks → Add endpoint:** `https://your-domain/api/stripe/webhook`, with these events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`. Copy its signing secret into `Billing__StripeWebhookSecret`.
 3. **Settings → Billing → Customer portal:** turn it on and allow cancelling. The app's "Manage billing or cancel" button opens it.
 
-### 6. Automatic deploys from GitHub
+### 6. Set up email (for password resets)
+
+The app sends email through SMTP, the standard way programs hand mail to an email service. These steps use Azure Communication Services, which costs a fraction of a cent per email. It takes about 30 minutes, plus waiting for DNS.
+
+**a. Create the email service and a sending domain**
+
+1. In the Azure portal: **Create a resource → Email Communication Services**. Put it in the same resource group as the web app. Data location: United States.
+2. Open it, then **Provision domains → Add domain → Custom domain**, and enter your domain (for example `apronstrings.app`).
+3. Azure shows DNS records to add at your domain registrar: a **TXT** record to prove you own it, then **SPF** (TXT) and two **DKIM** (CNAME) records so mail isn't marked as spam. Add each one, then click **Verify** next to it. All four need to say Verified. DNS can take from a few minutes to a few hours.
+   - Just testing before you have a domain? Choose **Add an Azure managed domain** instead. It's instant, but it sends from a `…azurecomm.net` address, has low sending limits and more often lands in spam.
+4. Open the domain → **MailFrom addresses**. `DoNotReply@yourdomain` is there by default. Change the display name to "Apron Strings".
+
+**b. Create the Communication Services resource and connect the domain**
+
+1. **Create a resource → Communication Services**, same resource group, data location United States.
+2. Open it → **Email → Domains → Connect domain**, and pick the domain from step a.
+
+**c. Give the app a login for SMTP**
+
+This uses an app registration, like the deploy login.
+
+1. **Microsoft Entra ID → App registrations → New registration**. Name it `ApronStrings-Email` and keep the defaults.
+2. In it, open **Certificates & secrets → Client secrets → New client secret**, set it to expire in 24 months, and **copy the Value straight away** (it's shown only once). This is the SMTP password. Put a reminder in your calendar to make a new one before it expires.
+3. Open the **Communication Services** resource → **Access control (IAM) → Add → Add role assignment**. Choose the role **Communication and Email Service Owner**, then **User, group, or service principal → Select members**, and pick `ApronStrings-Email`. Then **Review + assign**.
+4. Still in the Communication Services resource, open **SMTP Usernames → Add SMTP Username**. Pick `ApronStrings-Email` and enter `DoNotReply@yourdomain` as the username. Wait until it says **Ready to use**. If the app isn't in the list, the role from step 3 hasn't applied yet; wait a few minutes.
+
+**d. Add the app settings** (web app → Environment variables → App settings, then Apply)
+
+| Name | Value |
+|---|---|
+| `Email__SmtpHost` | `smtp.azurecomm.net` |
+| `Email__SmtpPort` | `587` |
+| `Email__SmtpUser` | the SMTP username from c4 |
+| `Email__SmtpPassword` | the client secret from c2 |
+| `Email__From` | `DoNotReply@yourdomain` |
+| `Site__BaseUrl` | `https://yourdomain` |
+
+**e. Test it.** Sign out, choose **Forgot your password?**, and enter your own email. If nothing arrives within a few minutes, check spam, then **Log stream** in the web app for a line starting "Couldn't send the password reset email":
+
+| Error mentions | Fix |
+|---|---|
+| `5.7.57` or authentication failed | Wrong SMTP username or password, or the client secret expired |
+| `5.3.5` sender's username is invalid | `Email__From` isn't a MailFrom address of a connected domain |
+| `5.7.1` not allowed / domain not linked | The domain isn't connected (step b2) or isn't verified |
+
+Prefer something simpler? Any SMTP email service works with the same settings. Brevo, for example, has a free tier: you verify your domain in its dashboard and it gives you an SMTP host, login and key to put in the `Email__…` settings.
+
+### 7. Automatic deploys from GitHub
 
 Deploys use the workflow Visual Studio created (`.github/workflows/CleanRoutine20261029180254.yml`) and run on every push to `main`. GitHub signs in to Azure through a Microsoft Entra **app registration** with no stored password, the same way the tea recipe app does. These pieces have to be in place:
 
@@ -135,14 +182,14 @@ If the deploy fails at **Azure Login**, the step before it lists which variables
 | AADSTS700213 "No matching federated identity record" | The subject in step 2 doesn't match. Copy it from the error message. |
 | "No subscriptions found" | Step 3: the role is missing or hasn't applied yet (wait about 5 minutes) |
 
-### 7. Set up each phone
+### 8. Set up each phone
 
 1. Open the site and create an account, or follow an invite link.
 2. **iPhone:** in Safari, tap **Share → Add to Home Screen**, then open the app from the Home Screen. iOS only allows notifications for Home Screen apps (iOS 16.4 or later).
    **Android:** in Chrome, tap the menu and choose **Add to Home screen** or **Install app**.
 3. Go to **Settings → Turn on notifications**, allow them, and tap **Send a test**.
 
-### 8. Free plan only: the morning wake-up job
+### 9. Free plan only: the morning wake-up job
 
 On B1 with Always On, skip this and you can delete `.github/workflows/reminder.yml`.
 
