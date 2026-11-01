@@ -43,7 +43,7 @@ public class ForgotModel(AccountService accounts, EmailSender email, IOptions<Si
         var text = $"""
             Hi {r.Name},
 
-            Someone (hopefully you) asked to reset your Apron Strings password. Open this link within an hour to choose a new one:
+            Someone (hopefully you) asked to reset your Make a Home password. Open this link within an hour to choose a new one:
 
             {link}
 
@@ -51,13 +51,13 @@ public class ForgotModel(AccountService accounts, EmailSender email, IOptions<Si
             """;
         var html = $"""
             <p>Hi {name},</p>
-            <p>Someone (hopefully you) asked to reset your Apron Strings password. Open this link within an hour to choose a new one:</p>
+            <p>Someone (hopefully you) asked to reset your Make a Home password. Open this link within an hour to choose a new one:</p>
             <p><a href="{link}" style="display:inline-block;background:#2F5DA8;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none">Choose a new password</a></p>
             <p style="color:#5D6A63;font-size:13px">If you didn't ask, ignore this email. Your password stays the same.</p>
             """;
         try
         {
-            await email.SendAsync(r.Email, "Reset your Apron Strings password", text, html);
+            await email.SendAsync(r.Email, "Reset your Make a Home password", text, html);
         }
         catch (Exception ex)
         {

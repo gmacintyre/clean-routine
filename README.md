@@ -1,4 +1,4 @@
-# Clean Routine
+# Make a Home
 
 A shared cleaning checklist for households. Anyone can sign up for free; the free version shows ads, and a household can pay to go ad-free.
 
@@ -14,7 +14,7 @@ It's ASP.NET Core 10 Razor Pages with **no NuGet packages**. Stripe and web push
 
 ## Why a web app, not a native app
 
-Clean Routine stays an installable web app (PWA) for launch:
+Make a Home stays an installable web app (PWA) for launch:
 
 - **It already works like an app.** People add it to their home screen, and it gets notifications on Android and on iPhone (iOS 16.4+, from the home screen).
 - **Payments cost less.** Stripe takes about 2.9% + 30¢. In-app purchases in the App Store or Google Play take 15% (small business rate) and the stores require them for digital upgrades like ad-free.
@@ -44,9 +44,9 @@ To try payments locally, use Stripe test keys and the Stripe CLI: `stripe listen
 
 1. **Make this repo private** (GitHub → Settings → General → Danger Zone → Change visibility) before adding any secrets. Secrets go in Azure app settings, never in the repo.
 2. **Move the app to the Basic B1 plan and turn on Always On** (about $13/month). The Free plan sleeps, so reminders in other time zones can't go out, has a 60 CPU-minutes/day cap, and can't use a custom domain, which AdSense needs.
-3. **Buy a domain** (for example `cleanroutine.app`) and add it to the web app with a free App Service managed certificate.
+3. **Add the domain `makeahome.app`** to the web app (Custom domains → Add custom domain) with a free App Service managed certificate.
 4. **Google AdSense:** apply with the domain, set up the consent message for EU/UK visitors (AdSense → Privacy & messaging), create three display ad units, and add the ids as app settings (below). The welcome page, privacy policy and terms are public so the review has content to look at.
-5. **Stripe:** create an account, a product "Clean Routine ad-free" with a price, a webhook, and turn on the customer portal (below).
+5. **Stripe:** create an account, a product "Make a Home ad-free" with a price, a webhook, and turn on the customer portal (below).
 6. **Privacy policy and terms:** the app has drafts at `/Privacy` and `/Terms`. Fill in `Site__OperatorName` and `Site__ContactEmail`, and have them reviewed.
 7. **Email for password resets:** set up an email service with SMTP (Azure Communication Services Email is the easy choice on Azure; Brevo, Postmark or Mailgun also work), send from your own domain, and add the `Email__…` settings (below). Until then, "Forgot your password?" asks people to email `Site__ContactEmail`.
 
@@ -90,10 +90,10 @@ In **Settings → Environment variables → App settings**, add these. Each name
 | `Push__Subject` | `mailto:` followed by your email |
 | `Site__OperatorName` | your name or business name, shown on the privacy policy and terms |
 | `Site__ContactEmail` | where people write for help |
-| `Site__BaseUrl` | the app's public address, e.g. `https://cleanroutine.app`, used in reset-email links |
+| `Site__BaseUrl` | the app's public address, e.g. `https://makeahome.app`, used in reset-email links |
 | `Email__SmtpHost` / `Email__SmtpPort` | SMTP server and port (587, STARTTLS), e.g. `smtp.azurecomm.net` |
 | `Email__SmtpUser` / `Email__SmtpPassword` | SMTP sign-in from your email service |
-| `Email__From` | sender address the service allows, e.g. `DoNotReply@cleanroutine.app` |
+| `Email__From` | sender address the service allows, e.g. `DoNotReply@makeahome.app` |
 | `Ads__AdSenseClientId` | `ca-pub-…` from AdSense |
 | `Ads__Slots__today` / `Ads__Slots__calendar` / `Ads__Slots__routine` | the ad unit ids (the `data-ad-slot` numbers) |
 | `Billing__StripeSecretKey` | `sk_live_…` (or `sk_test_…` while testing) |
@@ -109,8 +109,8 @@ Data is saved under `%HOME%/data/clean-routine/`, App Service's persistent stora
 
 ### 5. Set up Stripe
 
-1. **Products → Add product:** "Clean Routine ad-free", with a recurring price (suggested $1.99/month or $14.99/year) or a one-time price. Copy the price id into `Billing__StripePriceId`.
-2. **Developers → Webhooks → Add endpoint:** `https://your-domain/api/stripe/webhook`, with these events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`. Copy its signing secret into `Billing__StripeWebhookSecret`.
+1. **Products → Add product:** "Make a Home ad-free", with a recurring price (suggested $1.99/month or $14.99/year) or a one-time price. Copy the price id into `Billing__StripePriceId`.
+2. **Developers → Webhooks → Add endpoint:** `https://makeahome.app/api/stripe/webhook`, with these events: `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`. Copy its signing secret into `Billing__StripeWebhookSecret`.
 3. **Settings → Billing → Customer portal:** turn it on and allow cancelling. The app's "Manage billing or cancel" button opens it.
 
 ### 6. Set up email (for password resets)
@@ -120,10 +120,10 @@ The app sends email through SMTP, the standard way programs hand mail to an emai
 **a. Create the email service and a sending domain**
 
 1. In the Azure portal: **Create a resource → Email Communication Services**. Put it in the same resource group as the web app. Data location: United States.
-2. Open it, then **Provision domains → Add domain → Custom domain**, and enter your domain (for example `apronstrings.app`).
+2. Open it, then **Provision domains → Add domain → Custom domain**, and enter `makeahome.app`.
 3. Azure shows DNS records to add at your domain registrar: a **TXT** record to prove you own it, then **SPF** (TXT) and two **DKIM** (CNAME) records so mail isn't marked as spam. Add each one, then click **Verify** next to it. All four need to say Verified. DNS can take from a few minutes to a few hours.
    - Just testing before you have a domain? Choose **Add an Azure managed domain** instead. It's instant, but it sends from a `…azurecomm.net` address, has low sending limits and more often lands in spam.
-4. Open the domain → **MailFrom addresses**. `DoNotReply@yourdomain` is there by default. Change the display name to "Apron Strings".
+4. Open the domain → **MailFrom addresses**. `DoNotReply@makeahome.app` is there by default. Change the display name to "Make a Home".
 
 **b. Create the Communication Services resource and connect the domain**
 
@@ -134,10 +134,10 @@ The app sends email through SMTP, the standard way programs hand mail to an emai
 
 This uses an app registration, like the deploy login.
 
-1. **Microsoft Entra ID → App registrations → New registration**. Name it `ApronStrings-Email` and keep the defaults.
+1. **Microsoft Entra ID → App registrations → New registration**. Name it `MakeAHome-Email` and keep the defaults.
 2. In it, open **Certificates & secrets → Client secrets → New client secret**, set it to expire in 24 months, and **copy the Value straight away** (it's shown only once). This is the SMTP password. Put a reminder in your calendar to make a new one before it expires.
-3. Open the **Communication Services** resource → **Access control (IAM) → Add → Add role assignment**. Choose the role **Communication and Email Service Owner**, then **User, group, or service principal → Select members**, and pick `ApronStrings-Email`. Then **Review + assign**.
-4. Still in the Communication Services resource, open **SMTP Usernames → Add SMTP Username**. Pick `ApronStrings-Email` and enter `DoNotReply@yourdomain` as the username. Wait until it says **Ready to use**. If the app isn't in the list, the role from step 3 hasn't applied yet; wait a few minutes.
+3. Open the **Communication Services** resource → **Access control (IAM) → Add → Add role assignment**. Choose the role **Communication and Email Service Owner**, then **User, group, or service principal → Select members**, and pick `MakeAHome-Email`. Then **Review + assign**.
+4. Still in the Communication Services resource, open **SMTP Usernames → Add SMTP Username**. Pick `MakeAHome-Email` and enter `DoNotReply@makeahome.app` as the username. Wait until it says **Ready to use**. If the app isn't in the list, the role from step 3 hasn't applied yet; wait a few minutes.
 
 **d. Add the app settings** (web app → Environment variables → App settings, then Apply)
 
@@ -147,8 +147,8 @@ This uses an app registration, like the deploy login.
 | `Email__SmtpPort` | `587` |
 | `Email__SmtpUser` | the SMTP username from c4 |
 | `Email__SmtpPassword` | the client secret from c2 |
-| `Email__From` | `DoNotReply@yourdomain` |
-| `Site__BaseUrl` | `https://yourdomain` |
+| `Email__From` | `DoNotReply@makeahome.app` |
+| `Site__BaseUrl` | `https://makeahome.app` |
 
 **e. Test it.** Sign out, choose **Forgot your password?**, and enter your own email. If nothing arrives within a few minutes, check spam, then **Log stream** in the web app for a line starting "Couldn't send the password reset email":
 

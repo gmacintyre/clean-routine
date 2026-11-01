@@ -1,13 +1,14 @@
 @page
 @model WelcomeModel
 @{
-    ViewData["Title"] = "A shared cleaning routine for your home";
+    ViewData["Title"] = "Make your house a home";
     ViewData["Description"] = "Free cleaning checklist and calendar you share with the people you live with. Daily, weekly, monthly and seasonal chores, with a daily reminder on your phone.";
 }
 
 <div class="hero">
-    <span class="eyebrow">Apron Strings</span>
-    <h1>Keep the house clean together, a little each day.</h1>
+    <span class="eyebrow">Make a Home</span>
+    <h1>Make your house a home.</h1>
+    <p><em>A house is made of brick and stone, a home is made of love alone.</em></p>
     <p>A shared cleaning checklist for everyone in your home. Each day has its own zone, bigger jobs come round once a month or once a season, and everyone can tick things off from their phone.</p>
     @if (Model.Deleted)
     {

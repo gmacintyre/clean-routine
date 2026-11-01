@@ -143,7 +143,7 @@
       document.getElementById("invite-share").addEventListener("click", async () => {
         const url = link.value;
         if (navigator.share) {
-          try { await navigator.share({ title: "Join our cleaning routine", text: "Share our cleaning checklist on Apron Strings:", url }); return; }
+          try { await navigator.share({ title: "Join our cleaning routine", text: "Share our cleaning checklist on Make a Home:", url }); return; }
           catch (e) { if (e.name === "AbortError") return; }
         }
         try { await navigator.clipboard.writeText(url); cr.toast("Invite link copied"); }

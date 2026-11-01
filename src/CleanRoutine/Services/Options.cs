@@ -38,7 +38,7 @@ public class SiteOptions
     public string OperatorName { get; set; } = "";
     /// <summary>Where people write with questions, privacy requests and account deletion.</summary>
     public string ContactEmail { get; set; } = "";
-    /// <summary>The app's public address, e.g. "https://cleanroutine.app", used for links in emails.
+    /// <summary>The app's public address, e.g. "https://makeahome.app", used for links in emails.
     /// Empty: use the address of the current request.</summary>
     public string BaseUrl { get; set; } = "";
 }
