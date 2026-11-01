@@ -1,7 +1,7 @@
 {
-  "name": "Apron Strings",
-  "short_name": "Apron Strings",
-  "description": "Homemaking, one sweet little list at a time",
+  "name": "Make a Home",
+  "short_name": "Make a Home",
+  "description": "Make your house a home.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

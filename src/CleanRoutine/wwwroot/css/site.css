@@ -1,6 +1,6 @@
 /* Layout: one phone-width column, bottom tab bar, works as a home-screen app */
 :root {
-  /* Apron Strings: buttercream, navy, cornflower, cherry */
+  /* Make a Home (Apron Strings theme): buttercream, navy, cornflower, cherry */
   --bg: #FFF8EC; --surface: #FFFFFF; --ink: #1F2A44; --muted: #5A6378; --line: #E9E0CF;
   --accent: #2F5DA8; --accent-soft: #DCE6F7; --on-accent: #FFFFFF;
   --amber: #B0303A; --amber-soft: #F8DEDF; --danger: #8E1B24;
@@ -43,6 +43,7 @@ a { color: var(--accent); }
 .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 .muted { color: var(--muted); }
 .note { font-size: 14px; color: var(--muted); }
+.tagline { font-family: var(--display); font-style: italic; font-size: 17px; color: var(--accent); }
 button, select, input { font: inherit; color: inherit; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
