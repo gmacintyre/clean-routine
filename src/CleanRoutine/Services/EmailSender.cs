@@ -13,7 +13,7 @@ public class EmailOptions
     public string? SmtpPassword { get; set; }
     /// <summary>Sender address, e.g. "DoNotReply@yourdomain.com". Must be allowed by the provider.</summary>
     public string? From { get; set; }
-    public string FromName { get; set; } = "Clean Routine";
+    public string FromName { get; set; } = "Apron Strings";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(SmtpHost) && !string.IsNullOrWhiteSpace(From);
 }

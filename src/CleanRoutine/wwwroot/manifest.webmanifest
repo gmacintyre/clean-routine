@@ -1,7 +1,7 @@
 {
   "name": "Clean Routine",
   "short_name": "Cleaning",
-  "description": "A shared cleaning checklist and calendar for your household",
+  "description": "Our daily cleaning checklist and calendar",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
