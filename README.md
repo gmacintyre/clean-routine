@@ -45,7 +45,7 @@ To try payments locally, use Stripe test keys and the Stripe CLI: `stripe listen
 1. **Make this repo private** (GitHub → Settings → General → Danger Zone → Change visibility) before adding any secrets. Secrets go in Azure app settings, never in the repo.
 2. **Move the app to the Basic B1 plan and turn on Always On** (about $13/month). The Free plan sleeps, so reminders in other time zones can't go out, has a 60 CPU-minutes/day cap, and can't use a custom domain, which AdSense needs.
 3. **Add the domain `makeahome.app`** to the web app (Custom domains → Add custom domain) with a free App Service managed certificate.
-4. **Google AdSense:** apply with the domain, set up the consent message for EU/UK visitors (AdSense → Privacy & messaging), create three display ad units, and add the ids as app settings (below). The welcome page, privacy policy and terms are public so the review has content to look at.
+4. **Google AdSense:** see "Set up AdSense" below. Do it after this version is live, so Google can review the public pages.
 5. **Stripe:** create an account, a product "Make a Home ad-free" with a price, a webhook, and turn on the customer portal (below).
 6. **Privacy policy and terms:** the app has drafts at `/Privacy` and `/Terms`. Fill in `Site__OperatorName` and `Site__ContactEmail`, and have them reviewed.
 7. **Email for password resets:** set up an email service with SMTP (Azure Communication Services Email is the easy choice on Azure; Brevo, Postmark or Mailgun also work), send from your own domain, and add the `Email__…` settings (below). Until then, "Forgot your password?" asks people to email `Site__ContactEmail`.
@@ -187,6 +187,19 @@ If the deploy fails at **Azure Login**, the step before it lists which variables
 2. **iPhone:** in Safari, tap **Share → Add to Home Screen**, then open the app from the Home Screen. iOS only allows notifications for Home Screen apps (iOS 16.4 or later).
    **Android:** in Chrome, tap the menu and choose **Add to Home screen** or **Install app**.
 3. Go to **Settings → Turn on notifications**, allow them, and tap **Send a test**.
+
+## Set up AdSense
+
+Do this after this version is live on makeahome.app, because Google reviews the public pages (welcome, privacy, terms).
+
+1. **Sign up** at https://adsense.google.com with the Google account that should get paid. Enter `makeahome.app` as your site and fill in your payment address.
+2. **Copy your publisher ID** (Account → Account information, `pub-` followed by 16 digits) and add the app setting `Ads__AdSenseClientId` = `ca-pub-` followed by the same 16 digits. The app then puts Google's ad code on every page for signed-out visitors and households on the free plan, and serves `makeahome.app/ads.txt`.
+3. **Verify and request review:** in AdSense, go to **Sites → makeahome.app**, choose **AdSense code snippet** as the verification method (it's already on the page), click **Verify**, then **Request review**. Review usually takes a few days and can take up to 2–4 weeks. Google emails you the result.
+4. **Consent message for Europe:** **Privacy & messaging → European regulations → Create message**. Pick makeahome.app, your languages and the privacy policy URL `https://makeahome.app/Privacy`, then **Publish**. Without this, Google won't show ads to visitors in the EU, UK and Switzerland.
+5. **Turn off Auto ads:** **Ads → By site → makeahome.app → edit → Auto ads off → Apply**. The app places its own ads below the content; Auto ads could put them between checklist items, where people tap by accident.
+6. **Create three ad units:** **Ads → By ad unit → Display ads**. Name it `Today`, keep **Responsive**, click **Create**, and copy the number after `data-ad-slot=` in the code it shows. Repeat for `Calendar` and `Routine`. Add the app settings `Ads__Slots__today`, `Ads__Slots__calendar` and `Ads__Slots__routine` with those numbers.
+
+Until approval, the ad spots stay blank or show the "go ad-free" card. If the review comes back "low value content", Google wants more public pages to look at; signed-in pages don't count.
 
 ## Where things live
 

@@ -4,7 +4,9 @@
 @{
     var signedIn = User.Identity?.IsAuthenticated == true;
     var nav = ViewData["Nav"] as string;
-    var loadAdSense = AdsConfig.Value.AdSenseConfigured && await Household.ShowAdsAsync();
+    // Load Google's ad script for visitors who aren't signed in too (the public pages show no ad units),
+    // so AdSense can find its code on the site when verifying it. Ad-free households never load it.
+    var loadAdSense = AdsConfig.Value.AdSenseConfigured && (!signedIn || await Household.ShowAdsAsync());
 }
 <!DOCTYPE html>
 <html lang="en">
