@@ -1,4 +1,4 @@
-name: Build and deploy .NET Core application to Web App CleanRoutine20261029180254
+name: Build and deploy .NET Core application to Web App CleaningRoutine
 on:
   push:
     branches:
@@ -7,7 +7,7 @@ permissions:
   id-token: write
   contents: read
 env:
-  AZURE_WEBAPP_NAME: CleanRoutine20261029180254
+  AZURE_WEBAPP_NAME: CleaningRoutine
   AZURE_WEBAPP_PACKAGE_PATH: src\CleanRoutine\published
   CONFIGURATION: Release
   DOTNET_CORE_VERSION: 10.0.x
