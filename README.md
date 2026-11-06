@@ -59,7 +59,7 @@ In the Azure portal: **Create a resource → Web App**
 - **Publish:** Code
 - **Runtime stack:** .NET 10 (LTS)
 - **Operating system:** Linux
-- **Pricing plan:** **Basic B1** (Free F1 works for testing only; see the launch checklist)
+- **Pricing plan:** **Basic B1** (needs Always On for reminders, so not Free F1)
 
 ### 2. Turn on these settings
 
@@ -101,7 +101,6 @@ In **Settings → Environment variables → App settings**, add these. Each name
 | `Billing__StripeWebhookSecret` | `whsec_…` from the webhook (step 5) |
 | `Billing__Mode` | `subscription` for a monthly/yearly price, `payment` for a one-time price |
 | `Billing__PriceLabel` | the price as shown in the app, e.g. `$1.99 a month` |
-| `Reminders__TriggerKey` | only if you stay on the Free plan and use the wake-up job (step 9) |
 
 `/ads.txt` is served automatically from `Ads__AdSenseClientId`. Without Stripe settings the Ad-free page says "coming soon"; without AdSense settings the ad spots show the "go ad-free" card (set `Ads__HouseAds` to `false` to hide it).
 
@@ -188,12 +187,6 @@ If the deploy fails at **Azure Login**, the step before it lists which variables
 2. **iPhone:** in Safari, tap **Share → Add to Home Screen**, then open the app from the Home Screen. iOS only allows notifications for Home Screen apps (iOS 16.4 or later).
    **Android:** in Chrome, tap the menu and choose **Add to Home screen** or **Install app**.
 3. Go to **Settings → Turn on notifications**, allow them, and tap **Send a test**.
-
-### 9. Free plan only: the morning wake-up job
-
-On B1 with Always On, skip this and you can delete `.github/workflows/reminder.yml`.
-
-On the Free plan the app sleeps, so the **Daily reminder wake-up** workflow calls `POST /api/reminders/run` every 15 minutes from about 5 AM to noon Eastern. Each call wakes the app and sends any reminders that are due. In GitHub **Settings → Secrets and variables → Actions**, add the secret `REMINDER_TRIGGER_KEY` (same value as `Reminders__TriggerKey`) and the variable `CLEAN_ROUTINE_URL`. The run log ends with `nothing-due`, `sent-N-of-M` (households reached of those due) or `push-not-configured`. This only suits households in US time zones with morning reminder times.
 
 ## Where things live
 

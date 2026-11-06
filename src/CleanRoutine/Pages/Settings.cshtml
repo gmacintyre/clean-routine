@@ -28,10 +28,6 @@
         </label>
         <div><button class="btn" type="submit">Save</button></div>
         <p class="note">This time applies to everyone in your household, in the @Model.Household.TimeZone time zone.</p>
-        @if (Model.UsesWakeUpJob)
-        {
-            <p class="note">Reminders can arrive up to about 20 minutes after the time you set.</p>
-        }
     </form>
 </section>
 

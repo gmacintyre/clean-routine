@@ -6,9 +6,7 @@ namespace CleanRoutine.Push;
 
 /// <summary>
 /// Sends each household its day's reminder once that household's reminder time has passed (in its own
-/// time zone), at most once a day. While the app is awake it checks every minute. On a plan without
-/// Always On the app sleeps when idle, so a scheduled GitHub Actions job also calls POST /api/reminders/run
-/// to wake it (see Program.cs).
+/// time zone), at most once a day. It checks every minute, so the app needs Always On (Basic plan or above).
 /// </summary>
 public class DailyReminderService(
     AccountStore accounts,
@@ -49,8 +47,7 @@ public class DailyReminderService(
     {
         if (!sender.IsConfigured) return "push-not-configured";
 
-        // Claim each due reminder before sending, so two callers at once (the timer and the wake-up job)
-        // can't both send it. The store's lock makes this check-and-set atomic.
+        // Claim each due reminder before sending, so two overlapping checks can't both send it. The store's lock makes this check-and-set atomic.
         // Look first without writing, so a minute with nothing due doesn't rewrite the accounts file.
         if (!await accounts.ReadAsync(a => a.Households.Any(h => IsDue(h, out _)))) return "nothing-due";
         var due = await accounts.WriteAsync(a =>

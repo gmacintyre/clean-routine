@@ -11,12 +11,9 @@ using Microsoft.Extensions.Options;
 namespace CleanRoutine.Pages;
 
 public class SettingsModel(AccountStore accounts, HouseholdStore store, AccountService accountService, WebPushSender push,
-    DayPlanner planner, HouseholdClock clock, CurrentHousehold household, IOptions<ReminderOptions> reminderOptions)
+    DayPlanner planner, HouseholdClock clock, CurrentHousehold household)
     : PageModel
 {
-    /// <summary>True when the app relies on the scheduled GitHub job (no Always On), which only runs in the morning.</summary>
-    public bool UsesWakeUpJob => !string.IsNullOrWhiteSpace(reminderOptions.Value.TriggerKey);
-
     public bool PushConfigured => push.IsConfigured;
     public string? PublicKey => push.PublicKey;
     public HouseholdInfo Household { get; private set; } = new();

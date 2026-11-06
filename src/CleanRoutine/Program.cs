@@ -1,6 +1,4 @@
 using Microsoft.AspNetCore.Authentication;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using CleanRoutine.Billing;
@@ -50,7 +48,6 @@ builder.Services.AddHttpClient(StripeBilling.HttpClientName, c =>
     c.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddSingleton<StripeBilling>();
-builder.Services.Configure<ReminderOptions>(builder.Configuration.GetSection("Reminders"));
 builder.Services.AddSingleton<DailyReminderService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DailyReminderService>());
 
@@ -108,11 +105,6 @@ builder.Services.AddRateLimiter(o =>
         : RateLimitPartition.GetFixedWindowLimiter(
             ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(5) }));
-    o.AddFixedWindowLimiter("wake", x =>
-    {
-        x.PermitLimit = 20;
-        x.Window = TimeSpan.FromMinutes(10);
-    });
 });
 
 builder.Services.AddRazorPages(o =>
@@ -174,24 +166,5 @@ app.MapPost("/api/stripe/webhook", async (HttpRequest request, StripeBilling bil
     })
     .AllowAnonymous()
     .DisableAntiforgery();
-
-// Wake-up link for plans without Always On: a scheduled GitHub Actions job calls this, which starts the
-// app if it's asleep and sends any reminders that are due. Calling it more often than needed is harmless.
-app.MapPost("/api/reminders/run", async (HttpRequest request, IOptions<ReminderOptions> options,
-        DailyReminderService reminders, CancellationToken ct) =>
-    {
-        var expected = options.Value.TriggerKey;
-        if (string.IsNullOrWhiteSpace(expected)) return Results.NotFound();
-
-        var given = request.Headers["X-Reminder-Key"].ToString();
-        var match = CryptographicOperations.FixedTimeEquals(
-            SHA256.HashData(Encoding.UTF8.GetBytes(given)), SHA256.HashData(Encoding.UTF8.GetBytes(expected)));
-        if (!match) return Results.Unauthorized();
-
-        return Results.Ok(new { status = await reminders.RunIfDueAsync(ct) });
-    })
-    .AllowAnonymous()
-    .DisableAntiforgery()
-    .RequireRateLimiting("wake");
 
 app.Run();
