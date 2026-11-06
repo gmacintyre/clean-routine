@@ -12,12 +12,14 @@ public class LoginModel(AccountService accounts) : PageModel
     [BindProperty] public string Email { get; set; } = "";
     [BindProperty] public string Password { get; set; } = "";
     public string? Error { get; private set; }
-    public bool SignUpOpen => accounts.SignUpOpen;
+    /// <summary>Set when someone with an account follows an invite link: after signing in they confirm joining.</summary>
+    [BindProperty(SupportsGet = true)] public string? Invite { get; set; }
 
     public IActionResult OnGet() => User.Identity?.IsAuthenticated == true ? Redirect("/") : Page();
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl)
     {
+        if (!string.IsNullOrWhiteSpace(Invite)) returnUrl = "/Join/" + Uri.EscapeDataString(Invite.Trim());
         var user = await accounts.ValidateAsync(Email, Password);
         if (user is null)
         {

@@ -1,0 +1,55 @@
+@page
+@model TermsModel
+@{
+    ViewData["Title"] = "Terms of use";
+    var who = string.IsNullOrWhiteSpace(Model.Site.OperatorName) ? "[operator name]" : Model.Site.OperatorName;
+    var email = string.IsNullOrWhiteSpace(Model.Site.ContactEmail) ? "[contact email]" : Model.Site.ContactEmail;
+}
+
+<article class="prose">
+    <div class="dayhead">
+        <span class="eyebrow">Make a Home</span>
+        <h1>Terms of use</h1>
+        <p class="note">Last updated November 1, 2026</p>
+    </div>
+    @if (Model.IsDraft)
+    {
+        <p class="banner">Draft: set Site__OperatorName and Site__ContactEmail, and have this reviewed, before launch.</p>
+    }
+
+    <p>These terms are an agreement between you and @who, who runs Make a Home. By creating an account you agree to them.</p>
+
+    <h2>The service</h2>
+    <p>Make a Home is a shared cleaning checklist. It's free to use and shows ads. You can pay to remove ads for your household. We may change or add features over time.</p>
+
+    <h2>Your account</h2>
+    <p>Give a real email address and keep your password to yourself. You're responsible for what happens in your account. Only invite people you live with or trust: everyone in a household can see and change its routine.</p>
+
+    <h2>Ad-free upgrade</h2>
+    <p>
+        Ad-free costs @Model.Billing.PriceLabel and covers everyone in your household.
+        @if (Model.Billing.IsSubscription)
+        {
+            <text>It renews automatically until you cancel. Cancel any time from the Ad-free page; you keep ad-free until the end of the period you've paid for.</text>
+        }
+        else
+        {
+            <text>It's a one-time payment.</text>
+        }
+        Payments are handled by Stripe. If something went wrong with a payment, email <a href="mailto:@email">@email</a> and we'll make it right.
+    </p>
+
+    <h2>Fair use</h2>
+    <p>Don't misuse the service: no trying to break in, overload it, or use it to send spam or store anything unlawful.</p>
+
+    <h2>No guarantees</h2>
+    <p>We work to keep Make a Home running and your data safe, but it's provided "as is", without warranties, and reminders may sometimes arrive late or not at all. To the extent the law allows, our liability is limited to what you paid us in the last 12 months.</p>
+
+    <h2>Ending</h2>
+    <p>You can delete your account at any time in Settings. We may suspend accounts that break these terms. If we ever shut the service down, we'll give at least 30 days' notice and refund any unused ad-free time.</p>
+
+    <h2>Changes</h2>
+    <p>We'll update the date above when these terms change, and tell you in the app about significant changes. Questions: <a href="mailto:@email">@email</a>.</p>
+
+    <p class="footer-links"><a href="/">Home</a><a asp-page="/Privacy">Privacy</a></p>
+</article>

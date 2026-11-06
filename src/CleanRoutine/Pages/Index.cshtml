@@ -97,6 +97,8 @@ else
 
 <a class="btn secondary" href="/Chore?frequency=Once&date=@IndexModel.Key(d)&returnUrl=@Uri.EscapeDataString("/?date=" + IndexModel.Key(d))">+ Add a one-off job for this day</a>
 
+<partial name="_Ad" model="@("today")" />
+
 @section Scripts {
 @if (TempData["Toast"] is string toast)
 {

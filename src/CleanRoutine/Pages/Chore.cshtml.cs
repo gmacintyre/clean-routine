@@ -7,9 +7,11 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 namespace CleanRoutine.Pages;
 
 /// <summary>Add a new chore or edit one: its name, how often it repeats, and which day it lands on.</summary>
-public class ChoreModel(HouseholdStore store, HouseholdClock clock) : PageModel
+public class ChoreModel(HouseholdStore store, HouseholdClock clock, CurrentHousehold household) : PageModel
 {
     public const int MaxTitle = 120;
+    /// <summary>Keeps one household's file a sensible size.</summary>
+    public const int MaxChores = 400;
 
     public class ChoreInput
     {
@@ -30,7 +32,7 @@ public class ChoreModel(HouseholdStore store, HouseholdClock clock) : PageModel
 
     public async Task<IActionResult> OnGetAsync(Frequency? frequency, DayOfWeek? weekday, string? date)
     {
-        Today = clock.Today;
+        Today = clock.Today((await household.GetAsync()).TimeZone);
         if (IsNew)
         {
             if (frequency is not null) Input.Frequency = frequency.Value;
@@ -40,7 +42,7 @@ public class ChoreModel(HouseholdStore store, HouseholdClock clock) : PageModel
             return Page();
         }
 
-        var task = await store.ReadAsync(d => d.Tasks.FirstOrDefault(t => t.Id == Id) is { } t
+        var task = await store.ReadAsync(User.HouseholdId(), d => d.Tasks.FirstOrDefault(t => t.Id == Id) is { } t
             ? new ChoreInput
             {
                 Title = t.Title,
@@ -58,7 +60,7 @@ public class ChoreModel(HouseholdStore store, HouseholdClock clock) : PageModel
 
     public async Task<IActionResult> OnPostAsync()
     {
-        Today = clock.Today;
+        Today = clock.Today((await household.GetAsync()).TimeZone);
         var title = (Input.Title ?? "").Trim();
         if (title.Length == 0) Errors.Add("Give the chore a name.");
         if (title.Length > MaxTitle) Errors.Add($"Keep the name under {MaxTitle} characters.");
@@ -67,9 +69,11 @@ public class ChoreModel(HouseholdStore store, HouseholdClock clock) : PageModel
         if (Input.Frequency is Frequency.Monthly or Frequency.Seasonal && Input.WeekOfMonth is < 1 or > 4)
             Errors.Add("Choose the 1st, 2nd, 3rd or 4th week.");
         if (Input.Frequency == Frequency.Once && Input.Date is null) Errors.Add("Choose the date it's due.");
+        if (IsNew && await store.ReadAsync(User.HouseholdId(), d => d.Tasks.Count) >= MaxChores)
+            Errors.Add($"A household can have up to {MaxChores} chores. Delete some old one-off jobs first.");
         if (Errors.Count > 0) return Page();
 
-        var saved = await store.WriteAsync(d =>
+        var saved = await store.WriteAsync(User.HouseholdId(), d =>
         {
             CleaningTask? task;
             if (IsNew)
@@ -102,7 +106,7 @@ public class ChoreModel(HouseholdStore store, HouseholdClock clock) : PageModel
 
     public async Task<IActionResult> OnPostDeleteAsync()
     {
-        var removed = await store.WriteAsync(d =>
+        var removed = await store.WriteAsync(User.HouseholdId(), d =>
         {
             var task = d.Tasks.FirstOrDefault(t => t.Id == Id);
             if (task is null) return null;

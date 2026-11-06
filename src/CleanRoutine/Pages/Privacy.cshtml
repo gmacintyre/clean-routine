@@ -1,0 +1,53 @@
+@page
+@model PrivacyModel
+@{
+    ViewData["Title"] = "Privacy policy";
+    var who = string.IsNullOrWhiteSpace(Model.Site.OperatorName) ? "[operator name]" : Model.Site.OperatorName;
+    var email = string.IsNullOrWhiteSpace(Model.Site.ContactEmail) ? "[contact email]" : Model.Site.ContactEmail;
+}
+
+<article class="prose">
+    <div class="dayhead">
+        <span class="eyebrow">Make a Home</span>
+        <h1>Privacy policy</h1>
+        <p class="note">Last updated November 1, 2026</p>
+    </div>
+    @if (Model.IsDraft)
+    {
+        <p class="banner">Draft: set Site__OperatorName and Site__ContactEmail, and have this reviewed, before launch.</p>
+    }
+
+    <p>Make a Home is run by @who. This page explains what we collect, why, and the choices you have.</p>
+
+    <h2>What we collect</h2>
+    <ul>
+        <li><strong>Your account:</strong> first name, email address and a scrambled (hashed) version of your password. We never see or store the password itself.</li>
+        <li><strong>Your household's routine:</strong> chores, day zones, which chores were ticked off, by whom and when, the household name and its time zone.</li>
+        <li><strong>Notifications:</strong> if you turn on reminders, the address your phone's browser gives us for sending notifications, and the kind of device (for example "iPhone").</li>
+        <li><strong>Payments:</strong> if you go ad-free, Stripe handles the payment. We receive a customer id, subscription status and your email, but never your card number.</li>
+        <li><strong>Technical logs:</strong> our host (Microsoft Azure) keeps standard server logs such as IP address and pages requested, for security and troubleshooting.</li>
+    </ul>
+
+    <h2>Ads</h2>
+    <p>The free version shows ads from Google AdSense. Google and its partners use cookies and similar technology to show ads and measure them, which can include ads based on your visits to this and other sites. You can learn more at <a href="https://policies.google.com/technologies/partner-sites" rel="noopener">How Google uses information from sites that use its services</a>, and turn off personalized ads at <a href="https://adssettings.google.com" rel="noopener">Google Ad Settings</a>. Where the law requires it (for example in the EU, UK and Switzerland), you're asked for consent first. Ad-free households see no ads and Google's ad code isn't loaded for them.</p>
+
+    <h2>How we use it</h2>
+    <p>Only to run the app: to sign you in, show your household's checklist, send your daily reminder, process the ad-free upgrade, and keep the service secure. We don't sell your personal information.</p>
+
+    <h2>Who can see it</h2>
+    <p>Everyone in your household sees the household's chores and who ticked them off. We share data only with the services that run the app: Microsoft Azure (hosting), Stripe (payments), Google (ads), and the browser push services (Apple, Google, Mozilla) that deliver notifications.</p>
+
+    <h2>How long we keep it</h2>
+    <p>Ticked-off history is kept for three years. Daily backups are kept for 14 days. When you delete your account (Settings → Account), it's removed straight away; if you were the last person in your household, the household's data is removed too. Copies in backups are gone within 14 days.</p>
+
+    <h2>Your choices</h2>
+    <p>You can change your routine, turn notifications off, or delete your account at any time in the app. To get a copy of your data or ask anything else about privacy, email <a href="mailto:@email">@email</a>.</p>
+
+    <h2>Children</h2>
+    <p>Make a Home is meant for adults managing a household and isn't directed at children under 13.</p>
+
+    <h2>Changes</h2>
+    <p>If we change this policy we'll update the date above, and tell you in the app if the change is significant.</p>
+
+    <p class="footer-links"><a href="/">Home</a><a asp-page="/Terms">Terms</a></p>
+</article>

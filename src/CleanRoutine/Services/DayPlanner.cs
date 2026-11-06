@@ -14,12 +14,21 @@ public record DayPlan(DateOnly Date, string? Zone, IReadOnlyList<PlannedTask> Ta
 public record CalendarDay(DateOnly Date, string? Zone, int Due, int Done, bool HasBigJob);
 
 /// <summary>Works out which tasks fall on which day, and what has been checked off.</summary>
-public class DayPlanner(HouseholdStore store)
+public class DayPlanner(HouseholdStore store, AccountStore accounts)
 {
-    public Task<DayPlan> GetDayAsync(DateOnly date) => store.ReadAsync(d =>
+    /// <summary>Display names by user id, for everyone in the household.</summary>
+    public Task<Dictionary<string, string>> NamesAsync(string householdId) => accounts.ReadAsync(a =>
+        a.Users.Where(u => u.HouseholdId == householdId).ToDictionary(u => u.Id, u => u.DisplayName));
+
+    public async Task<DayPlan> GetDayAsync(string householdId, DateOnly date)
+    {
+        var names = await NamesAsync(householdId);
+        return await store.ReadAsync(householdId, d => Plan(d, date, names));
+    }
+
+    private static DayPlan Plan(HouseholdData d, DateOnly date, Dictionary<string, string> names)
     {
         var done = d.Completions.Where(c => c.Date == date).ToDictionary(c => c.TaskId, c => c.UserId);
-        var names = d.Users.ToDictionary(u => u.Id, u => u.DisplayName);
         var tasks = d.Tasks.Where(t => Schedule.IsDue(t, date))
             .Select(t =>
             {
@@ -29,9 +38,10 @@ public class DayPlanner(HouseholdStore store)
             })
             .ToList();
         return new DayPlan(date, d.Zones[(int)date.DayOfWeek], tasks);
-    });
+    }
 
-    public Task<IReadOnlyList<CalendarDay>> GetRangeAsync(DateOnly from, DateOnly to) => store.ReadAsync(d =>
+    public Task<IReadOnlyList<CalendarDay>> GetRangeAsync(string householdId, DateOnly from, DateOnly to) =>
+        store.ReadAsync(householdId, d =>
     {
         var doneByDate = d.Completions.Where(c => c.Date >= from && c.Date <= to)
             .GroupBy(c => c.Date)
@@ -48,8 +58,8 @@ public class DayPlanner(HouseholdStore store)
     });
 
     /// <summary>Check a task off, or un-check it. Returns true when it ends up done.</summary>
-    public Task<bool?> ToggleAsync(string taskId, DateOnly date, string userId, DateTimeOffset now) =>
-        store.WriteAsync<bool?>(d =>
+    public Task<bool?> ToggleAsync(string householdId, string taskId, DateOnly date, string userId, DateTimeOffset now) =>
+        store.WriteAsync<bool?>(householdId, d =>
         {
             var task = d.Tasks.FirstOrDefault(t => t.Id == taskId);
             if (task is null || !Schedule.IsDue(task, date)) return null;
